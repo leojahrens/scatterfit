@@ -1,5 +1,4 @@
-d title
-d description
-d Distribution-Date: 12ap23
+v 1
+d scatterfit. Scatterplot with fit lines
+d Leo Ahrens
 f scatterfit.ado 
-
