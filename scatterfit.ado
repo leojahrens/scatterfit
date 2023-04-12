@@ -1,8 +1,8 @@
-*! version 1.0  12apr23  Leo Ahrens
+*! version 1.0 Leo Ahrens
 
-program lscatter
-	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) ///
-	COVariates(string) ABSorb(string) coef vce(string) coefplace(string) jitter(numlist) COLorscheme(string) PLOTScheme(string) opts(string asis)]
+program scatterfit
+	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
+	ABSorb(string) coef vce(string) coefplace(string) jitter(numlist) COLorscheme(string) PLOTScheme(string) opts(string asis)]
 
 	// install dependencies
 	foreach package in reghdfe gtools {
@@ -31,6 +31,10 @@ program lscatter
 	}
 	if ("`coefplace'"!="" | "`vce'"!="") & "`coef'"=="" {
 		di as error "The coefplace() and vce() options require the coef option."
+		exit 498
+	}
+	if "`discrete'"!="" & "`binned'"=="" {
+		di as error "The discrete option requires the binned option."
 		exit 498
 	}
 	
@@ -127,8 +131,10 @@ program lscatter
 		qui colorpalette `colorscheme', `colorschemeopts' op(`i') nograph local(,prefix(c) suffix(o`i') nonames) 
 	}
 	if "`plotscheme'"=="" {
-		local plotscheme scheme(plotplain) graphregion(lc(white) lw(vthick)) ysc(lc(black) lw(thin)) xsc(lc(black) lw(thin)) ///
-		ylab(, $axisgridopts) xlab(, $axisgridopts) title(,size(medium))
+		local plotscheme scheme(plotplain) graphregion(lc(white) lw(vthick)) title(,size(medium)) ///
+		ysc(lc(black) lw(thin)) ylab(, labs(*1.05) tlc(black) tlw(thin) glc(gs13) glp(solid) glw(thin) gmin gmax) ///
+		xsc(lc(black) lw(thin)) xlab(, labs(*1.05) tlc(black) tlw(thin) glc(gs13) glp(solid) glw(thin) gmin gmax)
+		
 		foreach i of numlist 1/8 {
 			local mlines`i' lc(`c`i'') lw(medthick)
 			local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
