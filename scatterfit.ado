@@ -1,6 +1,6 @@
-﻿*! version 1.1 Leo Ahrens
-cap program drop scatterfit2
-program scatterfit2
+*! version 1.1 Leo Ahrens
+
+program scatterfit
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
 	ABSorb(string) coef vce(string) coefplace(string) jitter(numlist) COLorscheme(string) PLOTScheme(string) opts(string asis)]
 
@@ -42,12 +42,13 @@ program scatterfit2
 	// declare x and y variables
 	tokenize `varlist'
 	local y `1'
+	local x `2'
 		
 	// prepare dataset
 	preserve
 	qui drop if mi(`x') | mi(`y')
 	if "`by'"!="" qui drop if mi(`by')
-	
+
 	// retrieve labels from variables
 	local xlab: variable label `x'
 	local xtitle xtitle("`xlab'")
