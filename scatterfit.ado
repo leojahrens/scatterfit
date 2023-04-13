@@ -1,4 +1,4 @@
-﻿*! version 1.15 Leo Ahrens
+*! version 1.15 Leo Ahrens
 
 program scatterfit
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
