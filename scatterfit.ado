@@ -1,4 +1,4 @@
-*! version 1.0 Leo Ahrens
+﻿*! version 1.1 Leo Ahrens
 cap program drop scatterfit2
 program scatterfit2
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
