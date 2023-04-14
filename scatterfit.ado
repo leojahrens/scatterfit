@@ -1,4 +1,4 @@
-*! version 1.2 Leo Ahrens
+*! version 1.2.5 Leo Ahrens
 
 program define scatterfit
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
@@ -17,7 +17,7 @@ program define scatterfit
 	if _rc==111 local paletteu = 1
 	if `paletteu'==1 ssc install colrspace, replace
 	if `paletteu'==1 ssc install palettes, replace
-	if "`plotscheme'"!="" capture set scheme plotplain
+	capture set scheme plotplain
 	if _rc==111 ssc install blindschemes, replace
 	capture which labmask
 	if _rc==111 ssc install labutil, replace
