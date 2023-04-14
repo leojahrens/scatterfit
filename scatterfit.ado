@@ -1,4 +1,4 @@
-*! version 1.2.5 Leo Ahrens
+*! version 1.2.6 Leo Ahrens
 
 program define scatterfit
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
@@ -72,7 +72,7 @@ program define scatterfit
 	levelsof `by', local(bynum)
 
 	// clean dataset
-	if "`covariates'"!="" {
+	if "`covariates'"!="" | "`absorb'"!="" {
 		foreach v of varlist `covariates' `absorb' {
 			local covdrop `covdrop' | mi(`v')
 			local covkeep `covkeep' `v'
@@ -117,11 +117,13 @@ program define scatterfit
 				reghdfe `v' `covariates', `hdfeabsorb' res(`v'_r)
 				sum `v'
 				replace `v'_r = `v'_r + r(mean)
-				local `v' `v'_r
 			}
+			local y `y'_r 
+			local x `x'_r
 		}
 		
 		if "`binned'"!="" {
+			dis "ja"
 			gen `y'_r = .
 			foreach bynum2 in `bynum' {
 				reghdfe `y' `covariates' i.`xbin' if `by'==`bynum2', `hdfeabsorb'
@@ -302,7 +304,7 @@ program define scatterfit
 		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `polybw2')
 	}
 	tw `sc' `pl', `lscatteropts'
-
+dis `" `sc' `pl'"'
 				
 	restore
 	}
