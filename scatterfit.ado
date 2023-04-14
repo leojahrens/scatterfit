@@ -1,22 +1,25 @@
-*! version 1.15 Leo Ahrens
+*! version 1.2 Leo Ahrens
 
-program scatterfit
+program define scatterfit
 	syntax varlist(min=2 max=2 numeric), [fit(string) by(string) BINned discrete NQuantiles(numlist) polybw(numlist) COVariates(string) ///
-	ABSorb(string) coef vce(string) coefplace(string) jitter(numlist) COLorscheme(string) PLOTScheme(string) opts(string asis)]
+	ABSorb(string) STANDardize coef vce(string) coefplace(string) jitter(numlist) COLorscheme(string) PLOTScheme(string) opts(string asis)]
 
 	// install dependencies
+	local gtoolsu = 0
+	local paletteu = 0
 	foreach package in reghdfe gtools {
 		capture which `package'
+		if _rc==111 & "`package'"=="gtools" local gtoolsu = 1 
 		if _rc==111 ssc install `package', replace
-		if _rc==111 & "`package'"=="gtools" gtools, upgrade
 	}
+	if `gtoolsu'==1 gtools, upgrade
 	capture which colorpalette
-	if _rc==111 ssc install colrspace, replace
-	capture which colorpalette
-	if _rc==111 ssc install palettes, replace
+	if _rc==111 local paletteu = 1
+	if `paletteu'==1 ssc install colrspace, replace
+	if `paletteu'==1 ssc install palettes, replace
 	if "`plotscheme'"!="" capture set scheme plotplain
 	if _rc==111 ssc install blindschemes, replace
-	
+
 	// check if everything is specified correctly
 	if "`coef'"!="" & "`by'"!="" {
 		di as error "The coefficient can only be plotted if the by() option is not specified."
@@ -38,24 +41,50 @@ program scatterfit
 		di as error "The discrete option requires the binned option."
 		exit 498
 	}
+	if ("`covariates'"!="" | "`absorb'"!="") & strpos("`fit'","ci") {
+		di as error "Please note that the displayed confidence intervals are incorrect in the presence of covariates due to not taking the controls into account. This will be fixed in a future version"
+	}
+	
+	quietly {
+	preserve
 	
 	// declare x and y variables
 	tokenize `varlist'
 	local y `1'
 	local x `2'
 		
-	// prepare dataset
-	preserve
-	qui drop if mi(`x') | mi(`y')
-	if "`by'"!="" qui drop if mi(`by')
+	// prepare by variable
+	local isthereby = 0
+	if "`by'"!="" local isthereby = 1
+	if "`by'"!="" local byparen by(`by')
+	if `isthereby'==0 {
+		gen sfitbyvar = 1
+		local by sfitbyvar
+	}
+	capture confirm numeric variable `by'
+	if _rc {
+		rename `by' oldby
+		egen `by' = group(oldby)
+		labmask `by', values(oldby)
+	}
+	levelsof `by', local(bynum)
+
+	// clean dataset
+	if "`covariates'"!="" {
+		foreach v of varlist `covariates' `absorb' {
+			local covdrop `covdrop' | mi(`v')
+			local covkeep `covkeep' `v'
+		}
+	}
+	drop if mi(`x') | mi(`y') | mi(`by') `covdrop'
+	keep `x' `y' `by' `covkeep'
 
 	// retrieve labels from variables
 	local xlab: variable label `x'
 	local xtitle xtitle("`xlab'")
 	local ylab: variable label `y'
 	local ytitle ytitle("`ylab'")
-	if "`by'"!="" {
-		qui levelsof `by', local(bynum)
+	if `isthereby'==1 {
 		foreach bynum2 in `bynum' {
 			local bylab`bynum2': label (`by') `bynum2'
 		}
@@ -63,82 +92,68 @@ program scatterfit
 
 	// generate bin variables
 	if "`binned'"!="" {
-		local xbin `x' 
-		if "`nquantiles'"=="" local nquantiles 40
 		if "`discrete'"=="" {
-			local xbin `x'_q
-			if "`by'"=="" {
-				gquantiles `x'_q = `x', xtile nq(`nquantiles')
-			}
-			else {
-				qui levelsof `by', local(bynum)
-				foreach bynum2 in `bynum' {
-					qui gquantiles `x'_q`bynum2' = `x' if `by'==`bynum2', xtile nq(`nquantiles')
-				}
-			}
+			if "`nquantiles'"=="" local nquantiles 30
+			gquantiles `x'_q = `x', xtile nq(`nquantiles') `byparen'
+			local xbin `x'_q `by'
 		}
-		if "`discrete'"!="" & "`by'"!="" {
-			qui levelsof `by', local(bynum)
-			foreach bynum2 in `bynum' {
-				qui gen `x'`bynum2' = `x' if `by'==`bynum2'
-			}
+		if "`discrete'"!="" {
+		    local xbin `x' `by'
 		}
 	}
 
-	// regression adjustment - no bins
-	local hdfeabsorb noabsorb 
-	if "`absorb'"!="" local hdfeabsorb absorb(`absorb')
-	if ("`covariates'"!="" | "`absorb'"!="") & "`binned'"=="" {
-		qui gstats transform (standardize) `y' `x', replace
-		qui reghdfe `y' `covariates', `hdfeabsorb' res(`y'_r)
-		qui reghdfe `x' `covariates', `hdfeabsorb' res(`x'_r)
-		local y `y'_r
-		local x `x'_r
-	}
-	
-	// regression adjustment - improved version w/ bins
-	if ("`covariates'"!="" | "`absorb'"!="") & "`binned'"!="" {
-		qui gstats transform (standardize) `y' `x', replace
-		qui reghdfe `y' `covariates' i.`xbin', `hdfeabsorb'
-		qui predict `y'_r if e(sample), xb
-		if "`covariates'"!="" {
-			foreach v of varlist `covariates' {
-				qui replace `y'_r = `y'_r - _b[`v']*`v'
+	// standardize 
+	if "`standardize'"!="" gstats transform (standardize) `y' `x', replace
+
+	// regression adjustment
+	if "`covariates'"!="" | "`absorb'"!="" {
+		local hdfeabsorb noabsorb
+		if "`absorb'"!="" local hdfeabsorb absorb(`absorb')
+
+		if "`binned'"=="" {
+			foreach v in `y' `x' {
+				reghdfe `v' `covariates', `hdfeabsorb' res(`v'_r)
+				sum `v'
+				replace `v'_r = `v'_r + r(mean)
+				local `v' `v'_r
 			}
 		}
-		local y `y'_r
+		
+		if "`binned'"!="" {
+			gen `y'_r = .
+			foreach bynum2 in `bynum' {
+				reghdfe `y' `covariates' i.`xbin' if `by'==`bynum2', `hdfeabsorb'
+				predict `y'_r`bynum2' if e(sample), xb
+				if "`covariates'"!="" {
+					foreach v of varlist `covariates' {
+						replace `y'_r`bynum2' = `y'_r`bynum2' - _b[`v']*`v' if `by'==`bynum2'
+					}
+				}
+				replace `y'_r = `y'_r`bynum2' if !mi(`y'_r`bynum2')
+			}
+			local y `y'_r
+		}
 	}
 
 	// retrieve linear fit coefficient
-	if (strpos("`fit'","lfit") | "`fit'"=="") & "`coef'"!="" & "`by'"=="" {
+	if (strpos("`fit'","lfit") | "`fit'"=="") & "`coef'"!="" & `isthereby'==0 {
 		if "`vce'"!="" local vce vce(`vce')
 		local hdfeabsorb noabsorb 
 		if "`absorb'"!="" local hdfeabsorb absorb(`absorb')
-		qui reghdfe `y' `x' `covariates', `hdfeabsorb' `vce'
+		reghdfe `y' `x' `covariates', `hdfeabsorb' `vce'
 		local beta = round(_b[`x'], .01)
 		local pval = round(2*normal(-abs(_b[`x']/_se[`x'])),.01)
 	}
 	
 	// mean within bins
 	if "`binned'"!="" {
-		if "`by'"=="" {
-			qui gegen `y'_mean = mean(`y'), by(`xbin')
-			qui gegen `x'_mean = mean(`x'), by(`xbin')
-			qui egen tag = tag(`xbin') if !mi(`y'_mean)
-			qui replace `y'_mean = . if tag!=1
-		}
-		if "`by'"!="" {
-			qui levelsof `by', local(bynum)
-			foreach bynum2 in `bynum' {
-				qui gegen `y'_mean`bynum2' = mean(`y') if `by'==`bynum2', by(`xbin'`bynum2')
-				qui gegen `x'_mean`bynum2' = mean(`x') if `by'==`bynum2', by(`xbin'`bynum2')
-				qui egen tag`bynum2' = tag(`xbin'`bynum2') if !mi(`y'_mean`bynum2')
-				qui replace `y'_mean`bynum2' = . if tag`bynum2'!=1
-			}
-		}
+		gegen `y'_mean = mean(`y'), by(`xbin')
+		gegen `x'_mean = mean(`x'), by(`xbin')
+		egen tag = tag(`xbin') if !mi(`y'_mean)
+		replace `y'_mean = . if tag!=1
 	}
 	
-	// adapt var locals to by / binned settings
+	// specify variable to be plotted depending on binned / non-binned
 	if "`binned'"=="" {
 		local yplot `y'
 		local xplot `x'
@@ -146,8 +161,6 @@ program scatterfit
 	else {
 		local yplot `y'_mean
 		local xplot `x'_mean
-		local xbin `x'_q
-		if "`discrete'"!="" local xbin `x'
 	}
 
 	// overall scheme options
@@ -155,9 +168,11 @@ program scatterfit
 		local colorscheme Set1
 		local colorschemeopts int(1.8)
 	}
-	qui colorpalette `colorscheme', `colorschemeopts' nograph local(,prefix(c) nonames)
-	foreach i of numlist 25 50 75 {
-		qui colorpalette `colorscheme', `colorschemeopts' op(`i') nograph local(,prefix(c) suffix(o`i') nonames) 
+	if !("`colorscheme'"=="" & "`plotscheme'"!="") {
+		colorpalette `colorscheme', `colorschemeopts' nograph local(,prefix(c) nonames)
+		foreach i of numlist 25 50 75 {
+			colorpalette `colorscheme', `colorschemeopts' op(`i') nograph local(,prefix(c) suffix(o`i') nonames) 
+		}
 	}
 	if "`plotscheme'"=="" {
 		local plotscheme scheme(plotplain) graphregion(lc(white) lw(vthick)) title(,size(medium)) ///
@@ -194,6 +209,18 @@ program scatterfit
 	}
 	else {
 		local plotscheme scheme(`plotscheme')
+		if "`colorscheme'"!="" {
+			foreach i of numlist 1/8 {
+				local mlines`i' lc(`c`i'')
+				local mlinesci`i' acol(`c`i'o50') clc(`c`i'')
+				local fullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') 
+				local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'')
+				foreach h of numlist 25 50 75 {
+					local scatter`h'm`i' mfc(`c`i'o`h'')
+					local mscatter`h'm`i' mfc(`c`i'o`h'')
+				}
+			}
+		}
 	}
 
 	// load fit type options
@@ -216,10 +243,10 @@ program scatterfit
 	}
 
 	// coefficient text options 
-	if (strpos("`fit'","lfit") | "`fit'"=="") & "`coef'"!="" & "`by'"=="" {
-		qui sum `yplot'
+	if (strpos("`fit'","lfit") | "`fit'"=="") & "`coef'"!="" & `isthereby'==0 {
+		sum `yplot'
 		local textplacey = r(max)+.1*r(max)
-		qui sum `xplot'
+		sum `xplot'
 		local textplacex = r(mean)
 		local textplace2 `textplacey' `textplacex'
 		if "`coefplace'"!="" local textplace2 `coefplace'
@@ -231,16 +258,16 @@ program scatterfit
 	if strpos("`fit'","lfit") | "`fit'"=="" local leg_fit Linear
 	if strpos("`fit'","qfit") local leg_fit Quadratic
 	if strpos("`fit'","poly") local leg_fit Local polynomial
-	if "`by'"=="" {
+	if `isthereby'==0 {
 		if !strpos("`fit'","ci") local legopts `legopts_all' legend(order(1 "Observed" 2 "`leg_fit' fit"))
 		if strpos("`fit'","ci") local legopts `legopts_all' legend(order(1 "Observed" 3 "`leg_fit' fit" 2 "95% CIs"))
 	}
 	else {
-		qui egen distinctby = group(`by')
-		qui sum distinctby
+		egen distinctby = group(`by')
+		sum distinctby
 		local maxdistinctby = r(max)
 		local coln = 0
-		qui levelsof `by', local(bynum)
+		levelsof `by', local(bynum)
 		foreach bynum2 in `bynum' {
 			local coln = `coln'+1
 			if !strpos("`fit'","ci") local coln2 = `coln'+`maxdistinctby'
@@ -249,20 +276,10 @@ program scatterfit
 		}
 		local legopts `legopts_all' legend(order(`legorder') col(2) textfirst)
 	}
-	
+
 	// scatter marker options
-	if "`by'"=="" | "`binned'"=="" {
-		qui count if !mi(`xplot') & !mi(`yplot')
-		local n = r(N)
-	}
-	else {
-		local n = 0
-		qui levelsof `by', local(bynum)
-		foreach bynum2 in `bynum' {
-			qui count if !mi(`xplot'`bynum2') & !mi(`yplot'`bynum2')
-			local n = `n'+r(N)
-		}
-	}
+	count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
+	local n = r(N)
 	if `n'<=100 local scattermarkers mfullscatterm
 	if `n'>100 & `n'<=300 local scattermarkers mscatter75m
 	if `n'>300 & `n'<=2000 local scattermarkers mscatter50m
@@ -274,25 +291,19 @@ program scatterfit
 	
 	// generate the plot
 	local lscatteropts `plotscheme' `xtitle' `ytitle' `printcoef2' `opts' `legopts'
-	
-	if "`by'"=="" {
-		tw (scatter `yplot' `xplot', ``scattermarkers'2' `jitter') (`fittype' `y' `x', `o1' `polybw2'), `lscatteropts'
+	local coln = 0
+	foreach bynum2 in `bynum' {
+		local coln = `coln'+1
+		local coln2 = `coln'
+		if `isthereby'==0 local coln2 = `coln'+1
+		local sc `sc' (scatter `yplot' `xplot' if `by'==`bynum2', ``scattermarkers'`coln2'' `jitter') 
+		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `polybw2')
 	}
-	
-	if "`by'"!="" {
-		local coln = 0
-		qui levelsof `by', local(bynum)
-		foreach bynum2 in `bynum' {
-			if "`binned'"!="" local bynum3 `bynum2'
-			local coln = `coln'+1
-			local sc `sc' (scatter `yplot'`bynum3' `xplot'`bynum3' if `by'==`bynum2', ``scattermarkers'`coln'' `jitter') 
-			local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `polybw2')
-		}
+	tw `sc' `pl', `lscatteropts'
 
-		tw `sc' `pl', `lscatteropts'
-	}
-	
+				
 	restore
+	}
 end
 
 

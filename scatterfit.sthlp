@@ -39,6 +39,7 @@ yvar xvar {cmd:,} [options] {p_end}
 
 {syntab:Other}
 {synopt :{opt jitter(num)}}Randomly varies the location of scatter points. Useful for strongly clustered scatter plots, e.g. with a discrete variable such as education years.{p_end}
+{synopt :{opt stand:ardize}}Standardizes {it:xvar} and {it:yvar} so that they have a standard deviation of one and a mean of zero.{p_end}
 {synopt :{opt opts(str)}}Passes on options to the twoway plot. For example, {opt opts(xtitle("Example"))} changes the x axis title. See {opt help twoway}.{p_end}
 {synopt :{opt plots:cheme(str)}}Specifies a graph scheme to be used, e.g. {opt plotscheme(white_tableau)}. If this option is not specified, a custom scheme defined by the scatterfit program is used.{p_end}
 {synopt :{opt col:orscheme(str)}}Specifies a custom color scheme, e.g. {opt plotscheme(tableau)}. If this option is not specified, a high-intensity version of Set1 is used.{p_end}
