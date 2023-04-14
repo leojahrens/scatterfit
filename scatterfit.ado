@@ -94,14 +94,10 @@ program define scatterfit
 
 	// generate bin variables
 	if "`binned'"!="" {
-		if "`discrete'"=="" {
-			if "`nquantiles'"=="" local nquantiles 30
-			gquantiles `x'_q = `x', xtile nq(`nquantiles') `byparen'
-			local xbin `x'_q `by'
-		}
-		if "`discrete'"!="" {
-		    local xbin `x' `by'
-		}
+		local xbin `x'_q `by'
+		if "`nquantiles'"=="" local nquantiles 30
+		if "`discrete'"=="" gquantiles `x'_q = `x', xtile nq(`nquantiles') `byparen'
+		if "`discrete'"!="" clonevar `x'_q = `x'
 	}
 
 	// standardize 
