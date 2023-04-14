@@ -7,7 +7,7 @@ program define scatterfit
 	// install dependencies
 	local gtoolsu = 0
 	local paletteu = 0
-	foreach package in reghdfe gtools {
+	foreach package in reghdfe gtools ftools {
 		capture which `package'
 		if _rc==111 & "`package'"=="gtools" local gtoolsu = 1 
 		if _rc==111 ssc install `package', replace
