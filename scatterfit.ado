@@ -19,6 +19,8 @@ program define scatterfit
 	if `paletteu'==1 ssc install palettes, replace
 	if "`plotscheme'"!="" capture set scheme plotplain
 	if _rc==111 ssc install blindschemes, replace
+	capture which labmask
+	if _rc==111 ssc install labutil, replace
 
 	// check if everything is specified correctly
 	if "`coef'"!="" & "`by'"!="" {
