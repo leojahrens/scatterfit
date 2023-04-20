@@ -508,12 +508,12 @@ else {
 
 // color palette
 if "`colorscheme'"=="" {
-	local cpal `" "255 0 0" "55 126 184" "21 196 2" "255 127 14" "166 32 255" "250 255 32" "16 217 239" "255 32 222" "'
+	local cpal `" "210 0 0" "49 113 166" "15 137 1" "255 127 14" "169 58 228" "41 217 231" "250 238 22"  "222 115 50" "'
 }
 else {
 	local cpal `colorscheme'
 }
-if "`cintensity'"=="" & "`colorscheme'"=="" local cpalo int(1.55)
+if "`cintensity'"=="" & "`colorscheme'"=="" local cpalo int(1.2)
 if "`cintensity'"=="" & "`colorscheme'"!="" local cpalo int(1)
 if "`cintensity'"!="" local cpalo int(`cintensity')
 
