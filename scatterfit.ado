@@ -9,8 +9,8 @@ version 13.1
 	
 #delimit ;
 
-syntax varlist(min=2 max=2)	[if] [in] [aweight fweight] , 
-[
+syntax varlist(min=2 max=2)	[if] [in] [aweight fweight] , [
+
 fit(string) bw(numlist max=1) polybw(numlist max=1) 
 by(string) 
 BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
@@ -21,8 +21,8 @@ JITter(numlist max=1)
 STANDardize 
 LEGINside
 MWeighted MSize(string)
-scale(string) xysize(string)
-plotscheme(string asis) colorscheme(string asis) CINTensity(numlist max=1)
+scale(string) XYSize(string)
+PLOTScheme(string asis) COLorscheme(string asis) CINTensity(numlist max=1)
 opts(string asis)
 
 ] ;
