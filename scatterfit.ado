@@ -542,7 +542,7 @@ if "`plotscheme'"=="" {
 	if "`binned'"=="" local globmsize = 1.1
 	if "`binned'"!="" local globmsize = 1.35
 	local osize = 1			*`globmsize'
-	local tsize = 1.02		*`globmsize'
+	local tsize = .98		*`globmsize'
 	local ssize = .85		*`globmsize'
 	local dsize = .8		*`globmsize'
 	if "`msize'"!="" {
@@ -550,30 +550,27 @@ if "`plotscheme'"=="" {
 			local msize2 = subinstr("`msize'","*","",.)
 			local msize = `msize2'
 		}
-		dis "-----------------------------"
-		dis `msize'
-		dis `msize'*5
 		foreach sizeloc in osize tsize ssize dsize {
 			local `sizeloc' = ``sizeloc''*`msize'
 		}
 		dis "2"
 	}
 	if `isthereby'==0 {
-		local m1 m(d) msize(*`tsize')
+		local m1 m(d) msize(*`dsize')
 		local m2 m(o) msize(*`osize')
 	}
 	else {
 		local m1 m(o) msize(*`osize')
-		local m2 m(d) msize(*`tsize')
+		local m2 m(d) msize(*`dsize')
 	}
 	foreach g in mfullscatterm mscatter25m mscatter50m mscatter75m { 
 		local `g'1 ``g'1' `m1'
 		local `g'2 ``g'2' `m2'
-		local `g'3 ``g'3' m(t) msize(*`ssize')
-		local `g'4 ``g'4' m(s) msize(*`dsize')
+		local `g'3 ``g'3' m(t) msize(*`tsize')
+		local `g'4 ``g'4' m(s) msize(*`ssize')
 		local `g'5 ``g'5' m(oh) msize(*`osize')
-		local `g'6 ``g'6' m(dh) msize(*`tsize')
-		local `g'7 ``g'7' m(th) msize(*`ssize')
+		local `g'6 ``g'6' m(dh) msize(*`dsize')
+		local `g'7 ``g'7' m(th) msize(*`tsize')
 		local `g'8 ``g'8' m(sh) msize(*`dsize')
 	}
 	foreach g in mlines mlinesci {
