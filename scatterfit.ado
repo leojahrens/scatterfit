@@ -1,4 +1,4 @@
-*! version 1.4   Leo Ahrens   leo@ahrensmail.de
+*! version 1.4.1   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -15,7 +15,7 @@ fit(string) bw(numlist max=1) polybw(numlist max=1)
 by(string) 
 BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
 Controls(varlist) Fcontrols(varlist) COVariates(varlist) ABSorb(varlist)
-coef COEFPlace(string)
+coef COEFPos(string) COEFPLace(string)
 vce(string)
 JITter(numlist max=1)
 STANDardize 
@@ -64,6 +64,7 @@ local x `2'
 if "`polybw'"!="" & "`bw'"=="" local bw `polybw'
 if "`absorb'"!="" & "`fcontrols'"=="" local fcontrols `absorb'
 if "`covariates'"!="" & "`controls'"=="" local controls `covariates'
+if "`coefplace'"!="" & "`coefpos'"=="" local coefpos `coefplace'
 
 // weight local
 if ("`weight'"!="") local w [`weight'`exp']
@@ -523,6 +524,10 @@ if "`colorscheme'"!="" | "`plotscheme'"=="" {
 	}
 }
 
+// store number of plotted scatter points 
+count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
+local n = r(N)
+
 // plot scheme
 if "`plotscheme'"=="" {
 	local plotscheme scheme(plotplain) graphregion(lc(white) lw(vthick)) title(,size(medium)) ///
@@ -539,8 +544,21 @@ if "`plotscheme'"=="" {
 			local mscatter`h'm`i' mfc(`c`i'o`h'') mlalign(outside) mlw(none)
 		}
 	}
-	if "`binned'"=="" local globmsize = 1.1
-	if "`binned'"!="" local globmsize = 1.35
+	
+	local nf = `n'
+	local nfmin = 18 
+	local nfmax = 500
+	if `nf'<`nfmin' local nf = `nfmin'
+	if `nf'>`nfmax' local nf = `nfmax'
+	local globmsize = ((((`nfmax'+1-`nf')*(1/`nfmax'))^30)+(`nfmax'*.0005))*(2.6^1.5)
+
+	if "`mweighted'"!="" {
+		local globmsize = `globmsize'*.3
+	}
+	if `isthereby'==1 {
+		local globmsize = `globmsize'*.8
+	}
+	
 	local osize = 1			*`globmsize'
 	local tsize = .98		*`globmsize'
 	local ssize = .85		*`globmsize'
@@ -553,7 +571,6 @@ if "`plotscheme'"=="" {
 		foreach sizeloc in osize tsize ssize dsize {
 			local `sizeloc' = ``sizeloc''*`msize'
 		}
-		dis "2"
 	}
 	if `isthereby'==0 {
 		local m1 m(d) msize(*`dsize')
@@ -591,7 +608,7 @@ else {
 			local mlines`i' lc(`c`i'') lw(medthick)
 			local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
 			local ciareas`i' lw(none) fc(`c`i'o30')
-			local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlw(thin)
+			local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlw(thin) mlalign(inside)
 			local mscatter75m`i' mfc(`c`i'o50') mlc(`c`i'o75') mlw(vthin) mlalign(inside)
 			foreach h of numlist 25 50  {
 				local mscatter`h'm`i' mfc(`c`i'o`h'') mlalign(outside) mlw(none)
@@ -607,8 +624,6 @@ if "`mweighted'"!="" {
 }
 
 // different scatter marker opacity depending on number of data points
-count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
-local n = r(N)
 if `n'<=100 local scattermarkers mfullscatterm
 if `n'>100 & `n'<=300 local scattermarkers mscatter75m
 if `n'>300 & `n'<=2000 local scattermarkers mscatter50m

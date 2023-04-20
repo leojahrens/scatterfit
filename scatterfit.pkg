@@ -1,11 +1,11 @@
-v 1.4
+v 1.4.1
 d scatterfit. Scatterplot with fit lines
 d
 d Leo Ahrens, Freie Universität Berlin
 d
 d Requires the following packages: gtools, ftools, palettes, colrspace, blindschemes, labutil
 d
-d Distribution-Date: 20230417
+d Distribution-Date: 20230420
 d Support: leo@ahrensmail.de
 f scatterfit.ado 
 f scatterfit.sthlp
