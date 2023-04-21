@@ -1,4 +1,4 @@
-*! version 1.4.2   Leo Ahrens   leo@ahrensmail.de
+*! version 1.4.3   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -486,7 +486,7 @@ if "`controls'`fcontrols'"!="" {
 if "`binned'"!="" {
 	gegen `y'_mean = mean(`y') `w', by(`xbin')
 	gegen `x'_mean = mean(`x') `w', by(`xbin')
-	if "`mweighted'"!="" egen scw = count(`y'), by(`xbin')
+	if "`mweighted'"!="" gegen scw = count(`y'), by(`xbin')
 	egen tag = tag(`xbin') if !mi(`y'_mean)
 	replace `y'_mean = . if tag!=1
 }
@@ -622,7 +622,9 @@ else {
 
 // marker weights
 if "`mweighted'"!="" {
-	if "`binned'"=="" egen scw = count(`y'), by(`xbin')
+	if "`binned'"=="" gegen scw = count(`y'), by(`xbin')
+	sum scw 
+	replace scw = scw/r(mean)
 	local scw [w=scw]
 }
 
