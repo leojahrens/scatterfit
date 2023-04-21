@@ -1,4 +1,4 @@
-*! version 1.4.1   Leo Ahrens   leo@ahrensmail.de
+*! version 1.4.2   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -300,7 +300,6 @@ if "`binned'"!="" {
 			clonevar `x'_q = `x'  
 		}
 		else {  // uniform bin
-			dis "--------------------------------------------   ja"
 			local `unibin' = `unibin'+1
 			gen `x'_q = .
 			local bincount = 0
@@ -539,12 +538,15 @@ if "`plotscheme'"=="" {
 		local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
 		local ciareas`i' lw(none) fc(`c`i'o30')
 		local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlw(thin)
+		local efullscatterm`i' `mfullscatterm`i''
 		local mscatter75m`i' mfc(`c`i'o50') mlc(`c`i'o75') mlw(vthin) mlalign(inside)
+		local escatter75m`i' `mscatter75m`i''
 		foreach h of numlist 25 50  {
 			local mscatter`h'm`i' mfc(`c`i'o`h'') mlalign(outside) mlw(none)
+			local escatter`h'm`i' `mscatter`h'm`i''
 		}
 	}
-	
+
 	local nf = `n'
 	local nfmin = 18 
 	local nfmax = 500
@@ -552,44 +554,45 @@ if "`plotscheme'"=="" {
 	if `nf'>`nfmax' local nf = `nfmax'
 	local globmsize = ((((`nfmax'+1-`nf')*(1/`nfmax'))^30)+(`nfmax'*.0005))*(2.6^1.5)
 
-	if "`mweighted'"!="" {
-		local globmsize = `globmsize'*.3
-	}
-	if `isthereby'==1 {
-		local globmsize = `globmsize'*.8
-	}
+	local osize = 1
+	local tsize = .98
+	local ssize = .85
+	local dsize = .8
 	
-	local osize = 1			*`globmsize'
-	local tsize = .98		*`globmsize'
-	local ssize = .85		*`globmsize'
-	local dsize = .8		*`globmsize'
-	if "`msize'"!="" {
-		if strpos("`msize'","*") {
-			local msize2 = subinstr("`msize'","*","",.)
-			local msize = `msize2'
+	if "`mweighted'"!="" local mweightedresize *.3
+	if `isthereby'==1 local mbyresize *.8
+	
+	if "`msize'"!="" & strpos("`msize'","*") {
+	    local msize2 = subinstr("`msize'","*","",.)
+		local mresize *`msize2'
+	}
+
+	foreach sizeloc in osize tsize ssize dsize {
+	    local e`sizeloc' = ``sizeloc''*`globmsize'
+		local m`sizeloc' = ``sizeloc''*`globmsize'`mresize'`mweightedresize'`mbyresize'
+	}
+
+	foreach en in e m {
+		if `isthereby'==0 {
+			local m1 m(d) msize(*``en'dsize')
+			local m2 m(o) msize(*``en'osize')
 		}
-		foreach sizeloc in osize tsize ssize dsize {
-			local `sizeloc' = ``sizeloc''*`msize'
+		else {
+			local m1 m(o) msize(*``en'osize')
+			local m2 m(d) msize(*``en'dsize')
+		}
+		foreach g in `en'fullscatterm `en'scatter25m `en'scatter50m `en'scatter75m { 
+			local `g'1 ``g'1' `m1'
+			local `g'2 ``g'2' `m2'
+			local `g'3 ``g'3' m(t) msize(*``en'tsize')
+			local `g'4 ``g'4' m(s) msize(*``en'ssize')
+			local `g'5 ``g'5' m(oh) msize(*``en'osize')
+			local `g'6 ``g'6' m(dh) msize(*``en'dsize')
+			local `g'7 ``g'7' m(th) msize(*``en'tsize')
+			local `g'8 ``g'8' m(sh) msize(*``en'dsize')
 		}
 	}
-	if `isthereby'==0 {
-		local m1 m(d) msize(*`dsize')
-		local m2 m(o) msize(*`osize')
-	}
-	else {
-		local m1 m(o) msize(*`osize')
-		local m2 m(d) msize(*`dsize')
-	}
-	foreach g in mfullscatterm mscatter25m mscatter50m mscatter75m { 
-		local `g'1 ``g'1' `m1'
-		local `g'2 ``g'2' `m2'
-		local `g'3 ``g'3' m(t) msize(*`tsize')
-		local `g'4 ``g'4' m(s) msize(*`ssize')
-		local `g'5 ``g'5' m(oh) msize(*`osize')
-		local `g'6 ``g'6' m(dh) msize(*`dsize')
-		local `g'7 ``g'7' m(th) msize(*`tsize')
-		local `g'8 ``g'8' m(sh) msize(*`dsize')
-	}
+
 	foreach g in mlines mlinesci {
 		local `g'1 ``g'1' lp(solid)
 		local `g'2 ``g'2' lp(dash)
@@ -624,10 +627,12 @@ if "`mweighted'"!="" {
 }
 
 // different scatter marker opacity depending on number of data points
-if `n'<=100 local scattermarkers mfullscatterm
-if `n'>100 & `n'<=300 local scattermarkers mscatter75m
-if `n'>300 & `n'<=2000 local scattermarkers mscatter50m
-if `n'>2000 local scattermarkers mscatter25m
+foreach en in e m {
+	if `n'<=100 local `en'scattermarkers `en'fullscatterm
+	if `n'>100 & `n'<=300 local `en'scattermarkers `en'scatter75m
+	if `n'>300 & `n'<=2000 local `en'scattermarkers `en'scatter50m
+	if `n'>2000 local `en'scattermarkers `en'scatter25m
+}
 
 // fit type
 if "`fit'"=="lfitci" local fittype lfitci
@@ -716,12 +721,17 @@ if strpos("`fit'","qfit") local leg_fit Quadratic
 if strpos("`fit'","poly") local leg_fit Local polynomial
 if strpos("`fit'","lowess") local leg_fit Lowess
 
+foreach ii of numlist 1/4 {
+    local n`ii' = `ii'
+	if "`mweighted'"!="" local n`ii' = `n`ii''+1
+}
+
 if `isthereby'==0 {
-	if !strpos("`fit'","ci") { // | (strpos("`fit'","ci") & "`controls'`fcontrols'"!="" & !(strpos("`fit'","lfit") | strpos("`fit'","qfit")))
-		local legopts `legopts' legend(order(1 "Observed" 2 "`leg_fit' fit"))
+	if !strpos("`fit'","ci") {
+		local legopts `legopts' legend(order(1 "Observed" `n2' "`leg_fit' fit"))
 	}
 	else {
-		local legopts `legopts' legend(order(1 "Observed" 3 "`leg_fit' fit" 2 "95% CIs"))
+		local legopts `legopts' legend(order(1 "Observed" `n3' "`leg_fit' fit" `n2' "95% CIs"))
 	}
 }
 
@@ -734,11 +744,12 @@ if `isthereby'==1 {
 	foreach bynum2 in `bynum' {
 		local coln = `coln'+1
 		if !strpos("`fit'","ci") | (strpos("`fit'","ci") & "`controls'`fcontrols'"!="") {
-			local coln2 = `coln'+`maxdistinctby'
+			local coln2 = `coln'+`maxdistinctby' 
 		}
 		else {
 			local coln2 = `coln'+`maxdistinctby'+`coln'
 		}
+		if "`mweighted'"!="" local coln2 = `coln2'+`maxdistinctby'
 		if `isbyvarlabeled'==1 local legorder `legorder' `coln' "`bylab`bynum2''" `coln2' ""
 		if `isbyvarlabeled'==0 local legorder `legorder' `coln' "`by'==`bynum2'" `coln2' ""
 	}
@@ -773,15 +784,29 @@ if "`xysize'"!="" {
 * compile the final plot
 *-------------------------------------------------------------------------------
 
+// options
 local lscatteropts `plotscheme' `xtitle' `ytitle' `printcoef2' `legopts' `plotsize' `opts' 
 if "`bw'"!="" local bw bw(`bw')
 if "`jitter'"!="" local jitter jitter(`jitter')
+
+// empty scatter marker plot for correct legend in case of weighted scatter markers
+if "`mweighted'"!="" {
+	local coln = 0
+	foreach bynum2 in `bynum' {
+		local coln = `coln'+1
+		local coln2 = `coln'
+		if `isthereby'==0 local coln2 = `coln'+1
+		local sce `sce' (scatter `yplot' `xplot' if `by'==`bynum2' & mi(`yplot'), ``escattermarkers'`coln2'')
+	}
+}
+
+// correct plot
 local coln = 0
 foreach bynum2 in `bynum' {
 	local coln = `coln'+1
 	local coln2 = `coln'
 	if `isthereby'==0 local coln2 = `coln'+1
-	local sc `sc' (scatter `yplot' `xplot' if `by'==`bynum2' `scw', ``scattermarkers'`coln2'' `jitter')
+	local sc `sc' (scatter `yplot' `xplot' if `by'==`bynum2' `scw', ``mscattermarkers'`coln2'' `jitter')
 	if (("`fit'"=="lfitci" | "`fit'"=="qfitci") & ("`controls'`fcontrols'"!="" | "`vce'"!="") & `isthereby'==0) | `binarydv'==1 {
 		if strpos("`fit'","ci") local ci `ci' (rarea cil ciu cix, `ciareas`coln'')
 		local pl (line pe cix, `o`coln'')
@@ -791,17 +816,14 @@ foreach bynum2 in `bynum' {
 	}
 }
 
+
 *-------------------------------------------------------------------------------
 * draw the final plot
 *-------------------------------------------------------------------------------
 
-tw `sc' `ci' `pl', `lscatteropts'
+tw `sce' `sc' `ci' `pl', `lscatteropts'
 	
-	
-	
-	
-	
-	
+
 *-------------
 restore
 }
