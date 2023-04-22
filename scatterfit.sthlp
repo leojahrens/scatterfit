@@ -18,15 +18,15 @@ yvar xvar {ifin}
 {synoptline}
 
 {syntab:Fit line and CIs}
-{synopt :{opt fit(str)}}Fit line. May be {opt lfit} for a linear fit, {opt lfitci} to include CIs, {opt qfit} / {opt qfitci} for a quadratic fit, {opt poly} / {opt polyci} for a local polynomial fit, or {opt lowess} for a lowess smoother.{p_end}
-{synopt :{opt bw(num)}} Bandwidth for the local polynomial / lowess smoother fit line. {p_end}
+{synopt :{opt fit(str)}}Fit line. May be {it:lfit} for a linear fit, {it:lfitci} to include CIs, {it:qfit} / {it:qfitci} for a quadratic fit, {it:poly} / {it:polyci} for a local polynomial fit, or {it:lowess} for a lowess smoother.{p_end}
+{synopt :{opt bw:idth(num)}} Bandwidth for the local polynomial / lowess smoother fit line. {p_end}
 
 {syntab:Multiple plots}
 {synopt :{opt by(var)}}Draws separate scatterplots and fit lines for each value of {it:var}.{p_end}
 
 {syntab:Bins}
 {synopt :{opt bin:ned}}Divides {it:xvar} into equally sized bins based on quantile cutoff points and plots mean values of {it:yvar} and {it:xvar} within these bins. {p_end}
-{synopt :{opt nq:uantiles(num)}}Choses the number of equally sized bins / quantiles. {p_end}
+{synopt :{opt nq:uantiles(num)}}Choose the number of equally sized bins / quantiles.{p_end}
 {synopt :{opt disc:rete}}Treats {it:xvar} as discrete and plots the means of {it:yvar} within each distinct value of {it:xvar}.{p_end}
 {synopt :{opt unib:in(num)}}Divides {it:xvar} into {it:num} equally spaced bins and plots the means of {it:yvar} and {it:xvar} within them.{p_end}
 {synopt :{opt binv:ar(varlist)}}Plots the means of {it:yvar} and {it:xvar} within each distinct value of {it:varlist}. Used when the bins are already defined in the dataset.{p_end}
@@ -39,29 +39,30 @@ yvar xvar {ifin}
 {synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of {opt reghdfe} (continuous {it:y}) or {opt logit} (binary {it:y}).{p_end}
 
 {syntab:Regression parameters}
-{synopt :{opt coef}}Prints the average marginal effect of {it:xvar} and the associated {it:p}-value into the plot. Obtained from OLS (continuous {it:yvar}) or Logit (binary {it:yvar}).{p_end}
-{synopt :{opt coefp:os(numlist)}}Overrides the placement of {opt coef} within the plot. For example, {opt coefplace(0 5)} choses 0 as the y-coordinate and 5 as the x-coordinate.{p_end}
+{synopt :{opt regp:arameters(str)}}Prints regression parameters into the plot. May contain {it:beta} (marginal effect of {it:xvar}), {it:se}, {it:pval}, {it:sig} (significance: *<.1, **<.05, ***<.001), {it:r2} / {it:adjr2}, {it:nobs} (N).{p_end}
+{synopt :{opt parp:os(numlist)}}Overrides the position of the parameters within the plot. For example, {opt parpos(0 5)} choses 0 as the y-coordinate and 5 as the x-coordinate.{p_end}
 
 {syntab:Scatter points}
-{synopt :{opt mw:eighted(num)}}Adjusts the marker size depending on the number of observations at distinct values of {it:yvar} and {it:xvar}.{p_end}
-{synopt :{opt ms:ize(num)}}Resizes the scatter markers. For example, {opt msize(.9)} decreases their size by 10%.{p_end}
+{synopt :{opt mw:eighted(num)}}Adjusts the marker size depending on the number of observations at distinct values of {it:yvar} and {it:xvar}. Useful with {opt discrete} and {opt unibin()}.{p_end}
 {synopt :{opt jit:ter(num)}}Randomly varies the location of scatter points.{p_end}
-
-{syntab:Plot size}
-{synopt :{opt xys:ize(num)}}Specifies the relative width to height. For example, {opt xysize(1.2)} draws a plot with 20% more width than height.{p_end}
-{synopt :{opt scale(num)}}Resizes all elements in the plot. For example, {opt scale(1.1)} increases text, marker, and lines sizes by 10%.{p_end}
 
 {syntab:Scheme and colors}
 {synopt :{opt plots:cheme(str)}}Defines an alternative graph scheme, such as {opt plotscheme(white_tableau)}. See the collection in https://github.com/asjadnaqvi/stata-schemepack.{p_end}
 {synopt :{opt col:orscheme(str)}}Defines a custom color palette (e.g. {opt plotscheme(tableau)}). To define your own colors, use a list of hex colors (e.g. {opt plotscheme(#E6007E #009FE3 #312783)}).{p_end}
 {synopt :{opt cint:ensity(num)}}Changes the color intensity. Higher values make colors darker.{p_end}
 
+{syntab:Plot and element size}
+{synopt :{opt scale(num)}}Resizes all elements in the plot. For example, {opt scale(1.1)} increases text, marker, and lines sizes by 10%.{p_end}
+{synopt :{opt ms:ize(num)}}Resizes the scatter markers.{p_end}
+{synopt :{opt pars:ize(num)}}Resizes the printed regression parameters.{p_end}
+{synopt :{opt legs:ize(num)}}Resizes the legend.{p_end}
+{synopt :{opt xys:ize(num)}}Specifies the relative width to height. For example, {opt xysize(1.2)} draws a plot with 20% more width than height.{p_end}
+
 {syntab:Other}
 {synopt :{opt stand:ardize}}Standardizes {it:xvar} and {it:yvar} to a standard deviation of one and a mean of zero.{p_end}
 {synopt :{opt legin:side}}Places the legend inside the plot region.{p_end}
 {synopt :{opt opts(str)}}Passes on options to the twoway plot. For example, {opt opts(xtitle("Example"))} changes the x axis title. See {opt help twoway}.{p_end}
-
-
+{synopt :{opt binarym:odel(str)}}Specifies the regression model used for binary dependent variables. Must be {it:logit} or {it:probit}.
 
 
 {title:Examples}

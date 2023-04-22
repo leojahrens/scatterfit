@@ -1,4 +1,4 @@
-*! version 1.4.3   Leo Ahrens   leo@ahrensmail.de
+*! version 1.4.5   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -11,20 +11,25 @@ version 13.1
 
 syntax varlist(min=2 max=2)	[if] [in] [aweight fweight] , [
 
-fit(string) bw(numlist max=1) polybw(numlist max=1) 
+fit(string) BWidth(numlist max=1)  
 by(string) 
 BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
-Controls(varlist) Fcontrols(varlist) COVariates(varlist) ABSorb(varlist)
-coef COEFPos(string) COEFPLace(string)
+Controls(varlist) Fcontrols(varlist)     
+BINARYModel(string)
+REGParameters(string) PARPos(string) PARSize(string)
 vce(string)
 JITter(numlist max=1)
 STANDardize 
-LEGINside
+LEGINside LEGSize(string)
 MWeighted MSize(string)
 scale(string) XYSize(string)
 PLOTScheme(string asis) COLorscheme(string asis) CINTensity(numlist max=1)
 opts(string asis)
 
+/* legacy */
+polybw(numlist max=1) 
+COVariates(varlist) ABSorb(varlist)
+coef COEFPos(string) COEFPLace(string)
 ] ;
 
 #delimit cr
@@ -55,16 +60,13 @@ if _rc==111 ssc install labutil, replace
 * prep
 *-------------------------------------------------------------------------------
 
+// suppress output
+quietly {
+
 // declare x and y variables
 tokenize `varlist'
 local y `1'
 local x `2'
-
-// harmonize legacy options
-if "`polybw'"!="" & "`bw'"=="" local bw `polybw'
-if "`absorb'"!="" & "`fcontrols'"=="" local fcontrols `absorb'
-if "`covariates'"!="" & "`controls'"=="" local controls `covariates'
-if "`coefplace'"!="" & "`coefpos'"=="" local coefpos `coefplace'
 
 // weight local
 if ("`weight'"!="") local w [`weight'`exp']
@@ -75,10 +77,29 @@ if ("`weight'"!="") local weightname = subinstr("`exp'","=","",.)
 * check if options are correct & output errors
 *-------------------------------------------------------------------------------
 
+// report that legacy options were specified and changed internally							*****
+if "`polybw'"!=""  di as error "You specified the legacy option {bf:polybw()}, which is now {bf:bwidth()}. The setting {bf:bwidth(`polybw')} is assumed."
+if "`absorb'"!="" di as error "You specified the legacy option {bf:absorb()}, which is now {bf:fcontrols()}. The setting {bf:fcontrols(`absorb')} is assumed"
+if "`covariates'"!="" di as error "You specified the legacy option {bf:covariates()}, which is now {bf:controls()}. The setting {bf:controls(`covariates')} is assumed"
+if "`coef'"!="" di as error "You specified the legacy option {bf:coef}, which is now governed by {bf:regparameters()}. The setting {bf:regparameters(beta pval)} is assumed."
+if "`coefpos'"!="" | "`coefplace'"!=""  di as error "You specified the legacy option {bf:coefpos()} or {bf:coefplace()}, which is now {bf:parpos()}. The setting {bf:parpos(`coefplace'`coefpos')} is assumed"
+
+// harmonize legacy options
+if "`polybw'"!="" & "`bwidth'"=="" local bwidth `polybw'
+if "`absorb'"!="" & "`fcontrols'"=="" local fcontrols `absorb'
+if "`covariates'"!="" & "`controls'"=="" local controls `covariates'
+if "`coef'"!="" & "`regparameters'"=="" local regparameters beta pval
+if "`coefplace'"!="" & "`parpos'"=="" local parpos `coefplace'
+if "`coefpos'"!="" & "`parpos'"=="" local parpos `coefpos'
+
 // x and y variables
 capture confirm numeric variable `x'
 if _rc {
 	di as error "{it:xvar} must be numeric."
+	exit 498
+}
+if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit") {
+	di as error "{bf:binarymodel()} must be specified to logit or probit."
 	exit 498
 }
 qui levelsof `y' `if', local(yval)
@@ -100,14 +121,18 @@ if `yvalcount'==2 {
 		di as error "It is advised to use the binned option with binary dependent variables."
 	}
 }
+if "`binarymodel'"!="" & `yvalcount'!=2 {
+	di as error "Logit/probit models require a binary dependent variable."
+	exit 498
+}
 
 // fit specification and option combinations correct?
 if !("`fit'"=="" | "`fit'"=="lfit" | "`fit'"=="lfitci" | "`fit'"=="qfit" | "`fit'"=="qfitci" | "`fit'"=="poly" | "`fit'"=="polyci" | "`fit'"=="lowess") {
 	di as error "fit() must be lfit, lfitci, qfit, qfitci, poly, or polyci."
 	exit 498
 }
-if "`bw'"!="" & !(strpos("`fit'","poly") | "`fit'"=="lowess") {
-	di as error "The bw() option requires a local polynomial fit or a lowess smother as the fit line."
+if "`bwidth'"!="" & !(strpos("`fit'","poly") | "`fit'"=="lowess") {
+	di as error "The bwidth() option requires a local polynomial fit or a lowess smother as the fit line."
 	exit 498
 }
 
@@ -133,8 +158,8 @@ if "`controls'`fcontrols'"!="" {
 	}
 }
 if "`vce'"!="" {
-	if !strpos("`fit'","ci") & "`coef'"=="" {
-		di as error "The vce() option requires that confidence intervals are drawn by fit(lfitci) / fit(qfitci) or that regression parameters are plotted via the coef option."
+	if !strpos("`fit'","ci") & "`regparameters'"=="" {
+		di as error "The vce() option requires that confidence intervals are drawn by fit(lfitci) / fit(qfitci) or that regression parameters are plotted via the regparameters() option."
 		exit 498
 	}
 	if "`by'"!="" {
@@ -148,29 +173,32 @@ if "`vce'"!="" {
 }
 
 // coefficient print
-if "`coef'"!="" {
+if "`regparameters'"!="" {
 	if strpos("`fit'","qfit") | strpos("`fit'","poly") |  "`fit'"=="lowess" {
-		dis as error "The beta coefficient and p-value can only be plotted for a linear fit."
+		dis as error "Regression parameters can only be plotted for a linear fit."
 		exit 498
 	}
 	if "`by'"!="" {
-		dis as error "The coef option is incompatible with by() - the beta coefficient and p-value can only be plotted for a single fit line."
+		dis as error "The regparameters() option is incompatible with by() - regression parameters can only be plotted for a single fit line."
+		exit 498
+	}
+	if strpos("`regparameters'","sig") & !strpos("`regparameters'","beta") {
+		dis as error "{bf:regparameters({it:sig})} requires {bf:regparameters({it:beta})}"
 		exit 498
 	}
 }
-if "`coefplace'"!="" & "`coef'"=="" {
-	di as error "The coefplace() option requires the coef option."
+if "`parpos'"!="" & "`regparameters'"=="" {
+	di as error "The parpos() option requires the regparameters() option."
 	exit 498
 }
 
-*-------------
-quietly {
-preserve
-*-------------
 
 *-------------------------------------------------------------------------------
 * drop superfluous observations and variables
 *-------------------------------------------------------------------------------
+
+// preserve original data
+preserve
 
 // clean dataset
 if "`controls'`fcontrols'"!="" | "`binvar'"!="" {
@@ -329,7 +357,7 @@ local xbin `x'_q `by'
 * gather parameters, confidence intervals, and point estimates
 *-------------------------------------------------------------------------------
 
-if `binarydv'==1 | "`coef'"!="" | "`controls'`fcontrols'"!="" | "`vce'"!="" {
+if `binarydv'==1 | "`regparameters'"!="" | "`controls'`fcontrols'"!="" | "`vce'"!="" {
 
 // prepare options
 	if "`vce'"!="" local vce vce(`vce')
@@ -340,67 +368,95 @@ if `binarydv'==1 | "`coef'"!="" | "`controls'`fcontrols'"!="" | "`vce'"!="" {
 	
 	// estimate regression
 	if `binarydv'==0 reghdfe `y' ``x'marg' `controls' `w', `hdfeabsorb' `vce'
-	if `binarydv'==1 logit `y' ``x'marg' `w', `vce'
+	if `binarydv'==1 {
+		if "`binarymodel'"=="" local binarymodel logit
+		`binarymodel' `y' ``x'marg' `w', `vce'
+	}
 	est sto regmodel
 	
-	// gather and round linear fit coefficient
-	if "`coef'"!="" {
+	// gather and round parameters
+	if "`regparameters'"!="" {
 		est res regmodel
 		if `binarydv'==0 {
 			local beta = _b[`x']
 			local pval = 2*normal(-abs(_b[`x']/_se[`x']))
+			local r2 = e(r2)
+			local adjr2 = e(r2_a)
+			local nobs = e(N)
+			if strpos("`regparameters'","se") {
+				qui reghdfe `y' ``x'marg' `controls' `w', `hdfeabsorb' `vce'
+				local se = r(table)[2,1]
+			}
 		}
 		if `binarydv'==1 {
 			margins, dydx(`x') post
 			local beta = r(table)[1,1]
 			est res regmodel
+			local r2 = e(r2_p)
+			local adjr2 = e(r2_p)
+			local nobs = e(N)
 			margins, dydx(`x')
 			local pval = e(p)
+			local se = r(table)[2,1]
 		}
-		foreach par in beta pval {
-			local smallround`par' = 0
-			if ``par''>=10 {
-				local `par'round "1"
-			}
-			else {
-				if ``par''>=1 {
-					local `par'round ".1"
+		if strpos("`regparameters'","sig") {
+			local siglevel = 99
+			if `pval'<.1 & `pval'>.05 local siglevel = .1
+			if `pval'<.05 & `pval'>.01 local siglevel = .05
+			if `pval'<.01 local siglevel = .01
+		}
+		foreach par in beta pval r2 adjr2 se {
+			if strpos("`regparameters'","`par'") {
+				local smallround`par' = 0
+				if ``par''>=10 | ``par''<=-10 {
+					local `par'round "1"
 				}
 				else {
-					local roundcount = 0
-					local `par'string "``par''"
-					local `par'round ".0"
-					foreach rr of numlist 2/6 {
-						if substr("``par'string'",`rr',1)!="0" {
-							local `par'round "``par'round'1"
-							continue, break
-						}
-						else {
-							local `par'round "``par'round'0"
-							local roundcount = `roundcount'+1
+					if ``par''>=1 | ``par''<=-1 {
+						local `par'round ".1"
+					}
+					else {
+						local roundcount = 0
+						local `par'string = subinstr("``par''","-","",.)
+						
+						local `par'round ".0"
+						foreach rr of numlist 2/6 {
+							if substr("``par'string'",`rr',1)!="0" {
+								local `par'round "``par'round'1"
+								continue, break
+							}
+							else {
+								local `par'round "``par'round'0"
+								local roundcount = `roundcount'+1
+							}
 						}
 					}
 				}
-			}
-			cap if strpos("``par'string'","e") local smallround`par' = 1
-			local `par' = round(``par'',``par'round')
-			if `smallround`par''==0 {
-				local `par' "= ``par''"
-			}
-			else {
-				local `par' "< .00001"
-			}
-			if strpos("``par''","000000") & "``par''"!="< .00001" {
-				foreach zz of numlist 1/9 {
-					if substr("``par''",`zz',1)=="." local dotpos = `zz'
+				dis "`par' " ``par'' " " ``par'round'
+				cap if strpos("``par'string'","e") & ``par''>0 local smallround`par' = 1
+				cap if strpos("``par'string'","e") & ``par''<0 local smallround`par' = -1
+				local `par' = round(``par'',``par'round')
+				if `smallround`par''==0 {
+					local `par' "= ``par''"
 				}
-				if "`dotpos'"!="" {
-					if "``par'round'"=="1" local `par' = substr("``par''",1,`dotpos'-1)
-					if "``par'round'"==".1" local `par' = substr("``par''",1,`dotpos'+1)
-					if "``par'round'"==".01" local `par' = substr("``par''",1,`dotpos'+2)
-					if "``par'round'"==".001" local `par' = substr("``par''",1,`dotpos'+3)
-					if "``par'round'"==".0001" local `par' = substr("``par''",1,`dotpos'+4)
-					if "``par'round'"==".00001" local `par' = substr("``par''",1,`dotpos'+5)
+				else if `smallround`par''==1 {
+					local `par' "< .00001"
+				}
+				else {
+					local `par' "{&cong} 0"
+				}
+				if strpos("``par''","000000") & "``par''"!="< .00001" {
+					foreach zz of numlist 1/9 {
+						if substr("``par''",`zz',1)=="." local dotpos = `zz'
+					}
+					if "`dotpos'"!="" {
+						if "``par'round'"=="1" local `par' = substr("``par''",1,`dotpos'-1)
+						if "``par'round'"==".1" local `par' = substr("``par''",1,`dotpos'+1)
+						if "``par'round'"==".01" local `par' = substr("``par''",1,`dotpos'+2)
+						if "``par'round'"==".001" local `par' = substr("``par''",1,`dotpos'+3)
+						if "``par'round'"==".0001" local `par' = substr("``par''",1,`dotpos'+4)
+						if "``par'round'"==".00001" local `par' = substr("``par''",1,`dotpos'+5)
+					}
 				}
 			}
 		}
@@ -419,7 +475,7 @@ if `binarydv'==1 | "`coef'"!="" | "`controls'`fcontrols'"!="" | "`vce'"!="" {
 		}
 		local mcount = 0
 		local margpoints 30
-		if strpos("`fit'","qfit") local margpoints 45
+		if strpos("`fit'","qfit") local margpoints 50
 		sum `x'2 `w'
 		range range r(min) r(max) `margpoints'
 		foreach p of numlist 1/`margpoints' {
@@ -492,10 +548,9 @@ if "`binned'"!="" {
 }
 
 *-------------------------------------------------------------------------------
-* specification & options for the final plot
+* specify variable to be plotted depending on binned / non-binned
 *-------------------------------------------------------------------------------
 
-// specify variable to be plotted depending on binned / non-binned
 if "`binned'"=="" {
 	local yplot `y'
 	local xplot `x'
@@ -505,7 +560,13 @@ else {
 	local xplot `x'_mean
 }
 
-// color palette
+count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
+local n = r(N)
+
+*-------------------------------------------------------------------------------
+* color palette
+*-------------------------------------------------------------------------------
+
 if "`colorscheme'"=="" {
 	local cpal `" "210 0 0" "49 113 166" "15 137 1" "255 127 14" "169 58 228" "41 217 231" "250 238 22"  "222 115 50" "'
 }
@@ -523,11 +584,10 @@ if "`colorscheme'"!="" | "`plotscheme'"=="" {
 	}
 }
 
-// store number of plotted scatter points 
-count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
-local n = r(N)
+*-------------------------------------------------------------------------------
+* overall plot scheme
+*-------------------------------------------------------------------------------
 
-// plot scheme
 if "`plotscheme'"=="" {
 	local plotscheme scheme(plotplain) graphregion(lc(white) lw(vthick)) title(,size(medium)) ///
 	ysc(lc(gs5) lw(thin)) ylab(#6, labs(*1.05) tlc(gs5) tlw(thin) glc(gs13) glp(solid) glw(thin) gmin gmax) ///
@@ -562,9 +622,9 @@ if "`plotscheme'"=="" {
 	if "`mweighted'"!="" local mweightedresize *.3
 	if `isthereby'==1 local mbyresize *.8
 	
-	if "`msize'"!="" & strpos("`msize'","*") {
-	    local msize2 = subinstr("`msize'","*","",.)
-		local mresize *`msize2'
+	if "`msize'"!="" {
+	    if strpos("`msize'","*") local msize = subinstr("`msize'","*","",.)
+		local mresize *`msize'
 	}
 
 	foreach sizeloc in osize tsize ssize dsize {
@@ -620,7 +680,11 @@ else {
 	}
 }
 
-// marker weights
+*-------------------------------------------------------------------------------
+* refine scatter markers
+*-------------------------------------------------------------------------------
+
+// marker size weight
 if "`mweighted'"!="" {
 	if "`binned'"=="" gegen scw = count(`y'), by(`xbin')
 	sum scw 
@@ -636,7 +700,10 @@ foreach en in e m {
 	if `n'>2000 local `en'scattermarkers `en'scatter25m
 }
 
-// fit type
+*-------------------------------------------------------------------------------
+* fit line
+*-------------------------------------------------------------------------------
+
 if "`fit'"=="lfitci" local fittype lfitci
 if "`fit'"=="lfit" | "`fit'"=="" | ("`fit'"=="lfitci" & ("`controls'`fcontrols'"!="" | "`vce'"!="")) local fittype lfit
 if "`fit'"=="qfitci" local fittype qfitci
@@ -656,9 +723,14 @@ if "`fit'"=="lfitci" | "`fit'"=="qfitci" | "`fit'"=="polyci" {
 	}
 }
 
-// coefficient text options 
+*-------------------------------------------------------------------------------
+* regression parameters
+*-------------------------------------------------------------------------------
+
 local wherecoef = 0
-if "`coef'"!="" {
+if "`regparameters'"!="" {
+	
+// figure out where to position the box
 	sum `yplot',d
 	local ymax = r(max)
 	local ymin = r(min)
@@ -703,21 +775,65 @@ if "`coef'"!="" {
 		}
 	}
 	local textplace `textplacey' `textplacex'
-	if "`coefplace'"!="" local textplace `coefplace'
-	local margtype {it:ß}
-	if `binarydv'==1 local margtype {it:{&delta}Pr/{&delta}x}
-	local printcoef2 text(`textplace' "`margtype' `beta'" "{it:p} `pval'", placement(center) size(*.85) box fc(white) lc(gs5) lw(thin) la(outside) margin(vsmall))
+	if "`parpos'"!="" local textplace `parpos'
+	
+// compile the text box
+	if strpos("`regparameters'","beta") | strpos("`regparameters'","ß") {
+		if strpos("`regparameters'","sig") {
+			if `siglevel'==.1 local sigstar *
+			if `siglevel'==.05 local sigstar **
+			if `siglevel'==.01 local sigstar ***
+		}
+		if `binarydv'==0 local betapar `""{it:ß} `beta'`sigstar'""'
+		if `binarydv'==1 local betapar `""{it:{&delta}Pr/{&delta}x} `beta'`sigstar'""'
+	}
+	if strpos("`regparameters'","r2") {
+		if `binarydv'==0 {
+			local r2par `""{it:R sq.} `r2'""'
+			if strpos("`regparameters'","adjr2") local r2par `""{it:Adj. R sq.} `adjr2'""'
+		}
+		if `binarydv'==1 {
+			if "`r2'"!="" local r2par `""{it:Pseudo R sq.} `r2'""'
+		}
+	}
+	if strpos("`regparameters'","pval") local pvalpar `""{it:p} `pval'""'
+	if strpos("`regparameters'","se") local separ `""{it:se} `se'""'
+	if strpos("`regparameters'","nobs") | strpos("`regparameters'","n") local nobspar `""{it:N} = `nobs'""'
+	
+	local parresize size(*.8)
+	if "`parsize'"!="" {
+	    if  strpos("`parsize'","*") local parsize = subinstr("`parsize'","*","",.)
+		local parresize size(*`parsize')
+	}
+
+	local printcoef2 text(`textplace' `betapar' `separ' `pvalpar' `r2par' `nobspar', ///
+	placement(center) `parresize' box fc(white) lc(gs5) lw(thin) la(outside) margin(vsmall) alignment(middle) linegap(.3))
 }
 
-// legend
+
+*-------------------------------------------------------------------------------
+* legend
+*-------------------------------------------------------------------------------
+
+// overall legend options
+if "`legsize'"=="" local legresize size(*1.05)
+if "`legsize'"!="" {
+	if strpos("`legsize'","*") local legsize = subinstr("`legsize'","*","",.)
+	local legresize size(*`legsize')
+}
+
 local legtype region(lc(white)) pos(3)
 if "`leginside'"!="" {
     local leginsidepl 5
 	if `wherecoef'==5 local leginsidepl 1
     local legtype ring(0) region(lc(gs5) fc(white)) pos(`leginsidepl')
 }
-local legopts legend(`legtype' size(*1.05))
 
+local legopts legend(`legtype' `legresize')
+
+// compile labels and legend options
+if "`binned'"=="" local leg_obs Observed
+if "`binned'"!="" local leg_obs Bin means
 if strpos("`fit'","lfit") | "`fit'"=="" local leg_fit Linear
 if strpos("`fit'","qfit") local leg_fit Quadratic
 if strpos("`fit'","poly") local leg_fit Local polynomial
@@ -730,10 +846,10 @@ foreach ii of numlist 1/4 {
 
 if `isthereby'==0 {
 	if !strpos("`fit'","ci") {
-		local legopts `legopts' legend(order(1 "Observed" `n2' "`leg_fit' fit"))
+		local legopts `legopts' legend(order(1 "`leg_obs'" `n2' "`leg_fit' fit"))
 	}
 	else {
-		local legopts `legopts' legend(order(1 "Observed" `n3' "`leg_fit' fit" `n2' "95% CIs"))
+		local legopts `legopts' legend(order(1 "`leg_obs'" `n3' "`leg_fit' fit" `n2' "95% CIs"))
 	}
 }
 
@@ -758,7 +874,11 @@ if `isthereby'==1 {
 	local legopts `legopts' legend(order(`legorder') col(2) textfirst)
 }
 
-// scale and size options
+
+*-------------------------------------------------------------------------------
+* overall plot size
+*-------------------------------------------------------------------------------
+
 if strpos("`scale'","*") {
 	local scale2 = subinstr("`scale'","*","",.)
 	local scale = `scale2'
@@ -788,7 +908,7 @@ if "`xysize'"!="" {
 
 // options
 local lscatteropts `plotscheme' `xtitle' `ytitle' `printcoef2' `legopts' `plotsize' `opts' 
-if "`bw'"!="" local bw bw(`bw')
+if "`bwidth'"!="" local bwidth bw(`bwidth')
 if "`jitter'"!="" local jitter jitter(`jitter')
 
 // empty scatter marker plot for correct legend in case of weighted scatter markers
@@ -814,7 +934,7 @@ foreach bynum2 in `bynum' {
 		local pl (line pe cix, `o`coln'')
 	}
 	else {
-		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `bw')
+		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `bwidth')
 	}
 }
 
