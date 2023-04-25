@@ -23,6 +23,7 @@ yvar xvar {ifin}
 
 {syntab:Multiple plots}
 {synopt :{opt by(var)}}Draws separate scatterplots and fit lines for each value of {it:var}.{p_end}
+{synopt :{opt bym:ethod(str)}}Defines whether the results are derived from separate analyses of stratified samples ({opt bymethod(stratify)}) or a unified regression model containing interaction terms ({opt bymethod(interact)}).{p_end}
 
 {syntab:Bins}
 {synopt :{opt bin:ned}}Divides {it:xvar} into equally sized bins based on quantile cutoff points and plots mean values of {it:yvar} and {it:xvar} within these bins. {p_end}
@@ -39,11 +40,12 @@ yvar xvar {ifin}
 {synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of {opt reghdfe} (continuous {it:y}) or {opt logit} (binary {it:y}).{p_end}
 
 {syntab:Regression parameters}
-{synopt :{opt regp:arameters(str)}}Prints regression parameters into the plot. May contain {it:beta} (marginal effect of {it:xvar}), {it:se}, {it:pval}, {it:sig} (significance: *<.1, **<.05, ***<.001), {it:r2} / {it:adjr2}, {it:nobs} (N).{p_end}
+{synopt :{opt regp:arameters(str)}}Prints regression parameters into the plot. May contain {it:coef}, {it:se}, {it:pval}, {it:sig} (*<.1, **<.05, ***<.001), {it:int} (for {opt bymethod(interact)}), {it:r2} / {it:adjr2}, {it:nobs} (N).{p_end}
 {synopt :{opt parp:os(numlist)}}Overrides the position of the parameters within the plot. For example, {opt parpos(0 5)} choses 0 as the y-coordinate and 5 as the x-coordinate.{p_end}
 
 {syntab:Scatter points}
 {synopt :{opt mw:eighted(num)}}Adjusts the marker size depending on the number of observations at distinct values of {it:yvar} and {it:xvar}. Useful with {opt discrete} and {opt unibin()}.{p_end}
+{synopt :{opt ml:abel(var)}}Uses the strings / value labels stored in {it:var} as scatter marker instead of the usual circles, diamonds, etc.{p_end}
 {synopt :{opt jit:ter(num)}}Randomly varies the location of scatter points.{p_end}
 
 {syntab:Scheme and colors}
