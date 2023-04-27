@@ -1,4 +1,4 @@
-*! version 1.5   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -95,13 +95,15 @@ if "`coefpos'"!="" & "`parpos'"=="" local parpos `coefpos'
 if strpos("`regparameters'","beta") local regparameters `regparameters' coef
 
 // x and y variables
-capture confirm numeric variable `x'
-if _rc {
-	di as error "{it:xvar} must be numeric."
-	exit 498
+foreach mm in x y {
+	capture confirm numeric variable ``mm''
+	if _rc {
+		di as error "{it:`mm'var} must be numeric."
+		exit 498
+	}
 }
 if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit") {
-	di as error "{bf:binarymodel()} must be specified to logit or probit."
+	di as error "{bf:binarymodel()} must contain logit or probit."
 	exit 498
 }
 qui levelsof `y' `if', local(yval)

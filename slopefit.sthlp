@@ -2,14 +2,14 @@
 {title:Title}
 
 {p2colset 5 18 20 2}{...}
-{p2col :{cmd:scatterfit}}Scatter plots with fit lines{p_end}
+{p2col :{cmd:scatterfit}}Scatter plots with fit lines that visualize the effect of {it:xvar} on {it:yvar} at different values of {it:zvar}{p_end}
 {p2colreset}{...}
 
 {marker syntax}{...}
 {title:Syntax}
 
 {p 8 15 2} {cmd:scatterfit}
-yvar xvar {ifin}
+yvar xvar zvar {ifin}
 {weight} {cmd:,} [options] {p_end}
 
 {marker opt_summary}{...}
@@ -17,30 +17,24 @@ yvar xvar {ifin}
 {synopthdr}
 {synoptline}
 
-{syntab:Fit line and CIs}
-{synopt :{opt fit(str)}}Fit line. May be {it:lfit} for a linear fit, {it:lfitci} to include CIs, {it:qfit} / {it:qfitci} for a quadratic fit, {it:poly} / {it:polyci} for a local polynomial fit, or {it:lowess} for a lowess smoother.{p_end}
-{synopt :{opt bw:idth(num)}} Bandwidth for the local polynomial / lowess smoother fit line. {p_end}
+{syntab:Overall slopes}
+{synopt :{opt fit(str)}}Specifies the fit line that plots the overall interaction model results. May be {it:lfit} for a linear fit, {it:lfitci} to include CIs, or {it:qfit} / {it:qfitci} for a quadratic fit.{p_end}
 
-{syntab:Multiple plots}
-{synopt :{opt by(var)}}Draws separate scatterplots and fit lines for each value of {it:var}.{p_end}
-{synopt :{opt bym:ethod(str)}}Defines whether the results are derived from separate analyses of stratified samples ({opt bymethod(stratify)}) or a unified regression model containing interaction terms ({opt bymethod(interact)}).{p_end}
-
-{syntab:Bins}
-{synopt :{opt bin:ned}}Divides {it:xvar} into equally sized bins based on quantile cutoff points and plots mean values of {it:yvar} and {it:xvar} within these bins. {p_end}
-{synopt :{opt nq:uantiles(num)}}Choose the number of equally sized bins / quantiles.{p_end}
-{synopt :{opt disc:rete}}Treats {it:xvar} as discrete and plots the means of {it:yvar} within each distinct value of {it:xvar}.{p_end}
-{synopt :{opt unib:in(num)}}Divides {it:xvar} into {it:num} equally spaced bins and plots the means of {it:yvar} and {it:xvar} within them.{p_end}
-{synopt :{opt binv:ar(varlist)}}Plots the means of {it:yvar} and {it:xvar} within each distinct value of {it:varlist}. Used when the bins are already defined in the dataset.{p_end}
+{syntab:Individual slopes}
+{synopt :{opt m:ethod(str)}}Determines for what values of {it:zvar} individual slopes of {it:xvar} are plotted. May be {it:quantiles} to divide {it:z} into quantiles, {it:unibin} for uniformly spaced bins, or {it:discrete}.{p_end}
+{synopt :{opt binv:ar(varlist)}}Plots the effects of {it:xvar} for each within each distinct value of {it:varlist}. Used when the bins are already defined in the dataset.{p_end}
+{synopt :{opt indslopesm:ethod(str)}}Determines how the individual slopes are computed. May be {it:interact} for a unified regression models including interactions or {it:stratify} for separate regressions.{p_end}
+{synopt :{opt indslopesci}}Includes 95% confidence intervals for the individual slopes.{p_end}
 
 {syntab:Conditioning on covariates}
-{synopt :{opt c:ontrols(varlist)}}Adjusts the relationship between {it:xvar} and {it:yvar} linearly for continuous covariates. Achieved by residualization or, when {opt binned} is used, the method by Cattaneo et al. (2022).{p_end}
+{synopt :{opt c:ontrols(varlist)}}Adjusts the relationship between {it:xvar} and {it:yvar} linearly for continuous covariates. Achieved by residualization.{p_end}
 {synopt :{opt fc:ontrols(varlist)}}Controls for factor variables, i.e. categorical variables such as gender or region.{p_end}
 
 {syntab:Uncertainty estimates}
 {synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of {opt reghdfe} (continuous {it:y}) or {opt logit} (binary {it:y}).{p_end}
 
 {syntab:Regression parameters}
-{synopt :{opt regp:arameters(str)}}Prints regression parameters into the plot. May contain {it:coef}, {it:se}, {it:pval}, {it:sig} (*<.1, **<.05, ***<.001), {it:int} (for {opt bymethod(interact)}), {it:r2} / {it:adjr2}, {it:nobs} (N).{p_end}
+{synopt :{opt regp:arameters(str)}}Prints parameters into the plot. May contain {it:coef} for information on how the slope of {it:xvar} changes when {it:zvar} increases by one unit, {it:pval} for the associated p-value, {it:sig} for significance (*<.1, **<.05, ***<.001), and {it:nobs} for N.{p_end}
 {synopt :{opt parp:os(numlist)}}Overrides the position of the parameters within the plot. For example, {opt parpos(0 5)} choses 0 as the y-coordinate and 5 as the x-coordinate.{p_end}
 
 {syntab:Scatter points}
@@ -69,34 +63,10 @@ yvar xvar {ifin}
 
 {title:Examples}
 
-{hline}
-{pstd}Load data{p_end}
 {phang2}{cmd:. sysuse auto}{p_end}
-
-{pstd}Simple scatter plot with a linear fit{p_end}
-{phang2}{cmd:. scatterfit weight length}{p_end}
-{hline}
-
-{pstd}Including CIs{p_end}
-{phang2}{cmd:. scatterfit weight length, fit(lfitci)}{p_end}
-{hline}
-
-{pstd}Local polynomial fit{p_end}
-{phang2}{cmd:. scatterfit weight length, fit(polyci) bw(10)}{p_end}
-{hline}
-
-{pstd}Plots by foreign{p_end}
-{phang2}{cmd:. scatterfit weight length, by(foreign)}{p_end}
-{hline}
-
-{pstd}With bins{p_end}
-{phang2}{cmd:. scatterfit weight length, binned nq(20)}{p_end}
-{hline}
-
-{pstd}With control variables and printed coefficient{p_end}
-{phang2}{cmd:. scatterfit weight length, controls(trunk) fcontrols(foreign) coef}{p_end}
-{hline}
-
+{phang2}{cmd:. slopefit weight length turn}{p_end}
+{phang2}{cmd:. slopefit weight length turn, fit(lfitci)}{p_end}
+{phang2}{cmd:. slopefit weight length turn, fit(lfitci) method(discrete)}{p_end}
 
 
 
