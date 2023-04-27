@@ -1,9 +1,9 @@
-# SCATTERFIT v1.5
+# SCATTERFIT v1.6
 
-Scatterfit is a user-written command for Stata that produces a wide range of scatter plots with overlaid fit lines. To install the package, execute the following command in Stata
+Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines: scatterfit and slopefit. To install the package, execute the following command in Stata
 
 ```
 net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
 ```
 
-Once installed, please see `help scatterfit` for syntax and the whole range of options.
+Once installed, please see `help scatterfit` and `help slopefit` for syntax and the whole range of options.
