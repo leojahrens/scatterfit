@@ -7,3 +7,8 @@ net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatte
 ```
 
 Once installed, please see `help scatterfit` and `help slopefit` for syntax and the whole range of options.
+There are two tutorials below that showcase the possibilities of the two commands. 
+
+# Creating plots with scatterfit
+
+<img src="./examples/gr1.png" height="400">
