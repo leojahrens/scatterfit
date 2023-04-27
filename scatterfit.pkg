@@ -1,4 +1,4 @@
-v 1.5
+v 1.6
 d scatterfit. Scatterplot with fit lines
 d
 d Leo Ahrens, Freie Universität Berlin
@@ -9,3 +9,5 @@ d Distribution-Date: 20230420
 d Support: leo@ahrensmail.de
 f scatterfit.ado 
 f scatterfit.sthlp
+f slopefit.ado 
+f slopefit.sthlp
