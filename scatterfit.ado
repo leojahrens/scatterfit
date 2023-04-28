@@ -1,4 +1,4 @@
-*! version 1.6   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.1   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 13.1
@@ -17,7 +17,7 @@ BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist m
 Controls(varlist) Fcontrols(varlist)     
 BINARYModel(string)
 REGParameters(string) PARPos(string) PARSize(string)
-vce(string)
+vce(string) Level(numlist max=1)
 JITter(numlist max=1)
 STANDardize 
 LEGINside LEGSize(string)
@@ -377,7 +377,7 @@ if "`binned'"!="" | "`mweighted'"!="" {
 
 
 *-------------------------------------------------------------------------------
-* specify if own predictions & CIs should be used in final plot
+* specify if own predictions & CIs should be used in final plot, and which
 *-------------------------------------------------------------------------------
 
 if ((`isthereby'==1 & "`bymethod'"=="interact") | "`controls'`fcontrols'"!="" | "`vce'"!="" | `binarydv'==1) & !strpos("`fit'","poly") & "`fit'"!="lowess" {
@@ -387,6 +387,12 @@ else {
 	local ownpred_plot = 0
 }
 
+// confidence level
+if strpos("`fit'","ci") {
+	if "`level'"=="" local level 95
+	local cilvl level(`level')
+	local cilvltext `level'%
+}
 
 *-------------------------------------------------------------------------------
 * estimate and store regression
@@ -406,14 +412,14 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 	// estimate
 	if "`bymethod'"=="stratify" {
 		foreach bynum2 in `bynum' {
-			if `binarydv'==0 reghdfe `y' ``x'marg' `controls' if `by'==`bynum2' `w', `hdfeabsorb' `vce'
-			if `binarydv'==1 `binarymodel' `y' ``x'marg' if `by'==`bynum2' `w', `vce'
+			if `binarydv'==0 reghdfe `y' ``x'marg' `controls' if `by'==`bynum2' `w', `hdfeabsorb' `vce' 
+			if `binarydv'==1 `binarymodel' `y' ``x'marg' if `by'==`bynum2' `w', `vce' 
 			est sto regmodel`bynum2'
 		}
 	}
 	else {
-		if `binarydv'==0 reghdfe `y' ``x'marg' `controls' `w', `hdfeabsorb' `vce'
-		if `binarydv'==1 `binarymodel' `y' ``x'marg' `w', `vce'
+		if `binarydv'==0 reghdfe `y' ``x'marg' `controls' `w', `hdfeabsorb' `vce' 
+		if `binarydv'==1 `binarymodel' `y' ``x'marg' `w', `vce' 
 		est sto regmodel
 	}
 }
@@ -447,7 +453,7 @@ if "`regparameters'"!="" {
 		if `isthereby'==1 & "`bymethod'"=="stratify" local bynumname `bynum2'
 		if `isthereby'==1 & "`bymethod'"=="interact" local atbymarg at(`by'=`bynum2')
 		est res regmodel`bynumname'
-		margins, dydx(`x') `atbymarg'
+		margins, dydx(`x') `atbymarg' 
 		local coef`bynum2' = r(table)[1,1]
 		local se`bynum2' = r(table)[2,1]
 		local pval`bynum2' = r(table)[4,1]
@@ -465,7 +471,7 @@ if "`regparameters'"!="" {
 		local count = 0
 		local intmargchecker " "
 		est res regmodel
-		margins, dydx(`x') at(`by'=(`bynum')) post
+		margins, dydx(`x') at(`by'=(`bynum')) post 
 		foreach bynum2 in `bynum' {
 			local count = `count'+1
 			local count2 = 0
@@ -562,7 +568,7 @@ if "`regparameters'"!="" {
 
 if `ownpred_plot'==1 {
 	
-	// get x var																	***************
+	// get x var
 	if `binarydv'==1 | "`binned'"!="" gen `x'2 = `x'
 	if `binarydv'==0 & "`binned'"=="" {
 		reghdfe `x' `controls' `w', `hdfeabsorb' res(`x'2)
@@ -597,7 +603,7 @@ if `ownpred_plot'==1 {
 		if "`bymethod'"=="stratify" local regmodelname `bynum2'
 		if `isthereby'==1 & "`bymethod'"=="interact" local margbysetting `by'=(`bynum2')
 		est res regmodel`regmodelname'	
-		margins, at(`x'=(`margat`bynum2'') `margbysetting') `atmean' post
+		margins, at(`x'=(`margat`bynum2'') `margbysetting') `atmean' `cilvl'  post
 		foreach num of numlist 1/`mcount' {
 			replace cix`bynum2' = `ranger`num'' if _n==`num'
 			replace cil`bynum2' = r(table)[5,`num'] if _n==`num'
@@ -1027,11 +1033,7 @@ if "`regparameters'"!="" {
 			}
 		}
 	}
-	
 
-	*if strpos("`regparameters'","coef") local coefpar `" "`coefpar'" "'
-	*if strpos("`regparameters'","se") 	local separ `" "`separ'" "'
-	*if strpos("`regparameters'","pval") local pvalpar `" "`pvalpar'" "'
 	if strpos("`regparameters'","r2") & !strpos("`regparameters'","adjr2") local r2par `" "`r2par'" "'
 	if strpos("`regparameters'","adjr2") local adjr2par `" "`adjr2par'" "'	
 	if strpos("`regparameters'","nobs") local nobspar `" "`nobspar'" "'
@@ -1050,7 +1052,6 @@ if "`regparameters'"!="" {
 			local coefpar `" `coefpar' "`pval`ee''" "'
 		}
 	}
-
 
 	// final text box
 	local printcoef2 text(`textplace' `coefpar' `intpar' `r2par' `adjr2par' `nobspar', ///
@@ -1097,7 +1098,7 @@ if `isthereby'==0 {
 		local legopts `legopts' legend(order(`firstlegel' `n2' "`leg_fit' fit"))
 	}
 	else {
-		local legopts `legopts' legend(order(`firstlegel' `n3' "`leg_fit' fit" `n2' "95% CIs"))
+		local legopts `legopts' legend(order(`firstlegel' `n3' "`leg_fit' fit" `n2' "`cilvltext' CIs"))
 	}
 }
 
@@ -1188,7 +1189,7 @@ foreach bynum2 in `bynum' {
 	
 	* fit line & CIs using off-the-shelf fitting
 	if `ownpred_plot'==0 {
-		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `bwidth')
+		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `bwidth' `cilvl')
 	}
 	
 	* own fit lines and CIs from margins

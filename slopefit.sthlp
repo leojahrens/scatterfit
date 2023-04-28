@@ -32,6 +32,7 @@ yvar xvar zvar {ifin}
 
 {syntab:Uncertainty estimates}
 {synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of {opt reghdfe} (continuous {it:y}) or {opt logit} (binary {it:y}).{p_end}
+{synopt :{opt l:evel(num)}}Specifies the confidence level for the CIs. Standard is 95.{p_end}
 
 {syntab:Regression parameters}
 {synopt :{opt regp:arameters(str)}}Prints parameters into the plot. May contain {it:coef} for information on how the slope of {it:xvar} changes when {it:zvar} increases by one unit, {it:pval} for the associated p-value, {it:sig} for significance (*<.1, **<.05, ***<.001), and {it:nobs} for N.{p_end}
@@ -44,7 +45,7 @@ yvar xvar zvar {ifin}
 
 {syntab:Scheme and colors}
 {synopt :{opt plots:cheme(str)}}Defines an alternative graph scheme, such as {opt plotscheme(white_tableau)}. See the collection in https://github.com/asjadnaqvi/stata-schemepack.{p_end}
-{synopt :{opt col:orscheme(str)}}Defines a custom color palette (e.g. {opt plotscheme(tableau)}). To define your own colors, use a list of hex colors (e.g. {opt plotscheme(#E6007E #009FE3 #312783)}).{p_end}
+{synopt :{opt col:orscheme(str)}}Defines a custom color palette (e.g. {opt colorscheme(tableau)}). To define your own colors, use a list of hex colors (e.g. {opt colorscheme(#E6007E #009FE3 #312783)}).{p_end}
 {synopt :{opt cint:ensity(num)}}Changes the color intensity. Higher values make colors darker.{p_end}
 
 {syntab:Plot and element size}
@@ -62,6 +63,8 @@ yvar xvar zvar {ifin}
 
 
 {title:Examples}
+
+A detailed tutorial with examples is available at https://github.com/leojahrens/scatterfit
 
 {phang2}{cmd:. sysuse auto}{p_end}
 {phang2}{cmd:. slopefit weight length turn}{p_end}

@@ -1,4 +1,4 @@
-*! version 1.6   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.1   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 13.1
@@ -17,7 +17,7 @@ INDSLOPESMethod(string) indslopesci
 Controls(varlist) Fcontrols(varlist)     
 BINARYModel(string)
 REGParameters(string) PARPos(string) PARSize(string)
-vce(string)
+vce(string) Level(numlist max=1)
 JITter(numlist max=1)
 STANDardize 
 LEGINside LEGSize(string)
@@ -119,12 +119,16 @@ if "`binvar'"!="" & ("`method'"!="" | "`nquantiles'"!="" | "`nunibin'"!="") {
 	di as error "The binvar() option cannot be combined with method(), nquantiles(), or nunibin()."
 	exit 498
 }
-if "`nunibin'"!="" & "`method'"!="unibin" {
+if "`nunibin'"!="" & ("`method'"!="unibin" & "`method'"!="") {
 	di as error "The nunibin() option requires method(unibin)."
 	exit 498
 }
-if "`nquantiles'"!="" & "`method'"!="quantiles" {
+if "`nquantiles'"!="" & ("`method'"!="quantiles" & "`method'"!="") {
 	di as error "The nquantiles() option requires method(quantiles)."
+	exit 498
+}
+if "`nquantiles'"!="" & "`nunibin'"!="" {
+	di as error "nquantiles() and nunibin() cannot be used together."
 	exit 498
 }
 // indslopesmethod
@@ -282,7 +286,8 @@ if "`standardize'"!="" {
 * generate / specify bin variable
 *-------------------------------------------------------------------------------
 
-if "`method'"=="" & "`binvar'"=="" local method quantiles
+if "`method'"=="" & "`binvar'"=="" & "`nunibin'"=="" local method quantiles
+if "`method'"=="" & "`binvar'"=="" & "`nunibin'"!="" local method unibin
 
 if "`method'"=="quantiles" {
     if "`nquantiles'"=="" local nquantiles 10
@@ -325,6 +330,9 @@ local zbinlength = r(max)
 
 // prep setting 
 if "`indslopesmethod'"=="" local indslopesmethod interact 
+if "`level'"=="" local level 95
+local cilvl level(`level')
+local cilvltext `level'%
 
 // factorize 
 foreach vv in `fcontrols' {
@@ -343,25 +351,25 @@ if "`binarymodel'"=="" local binarymodel logit
 
 // estimate factorized
 if "`indslopesmethod'"=="interact" {
-	if `binarydv'==0 reghdfe `y' `xzfactor' `controls' `w', `hdfeabsorb' `vce'
-	if `binarydv'==1 `binarymodel' `y' `xzfactor' `controls' `fcontrols_f' `w', `vce'
+	if `binarydv'==0 reghdfe `y' `xzfactor' `controls' `w', `hdfeabsorb' `vce' `cilvl'
+	if `binarydv'==1 `binarymodel' `y' `xzfactor' `controls' `fcontrols_f' `w', `vce' `cilvl'
 	est sto regm_fact
 }
 if "`indslopesmethod'"=="stratify" {
 	foreach zlvl2 in `zlvl' {
-		if `binarydv'==0 reghdfe `y' `xzfactor' `controls' if zbin==`zlvl2' `w', `hdfeabsorb' `vce'
-		if `binarydv'==1 `binarymodel' `y' `xzfactor' `controls' if zbin==`zlvl2' `fcontrols_f' `w', `vce'
+		if `binarydv'==0 reghdfe `y' `xzfactor' `controls' if zbin==`zlvl2' `w', `hdfeabsorb' `vce' `cilvl'
+		if `binarydv'==1 `binarymodel' `y' `xzfactor' `controls' if zbin==`zlvl2' `fcontrols_f' `w', `vce' `cilvl'
 		est sto regm_fact`zlvl2'
 	}
 }
 
 // estimate continuous
 if `binarydv'==0 {
-	reghdfe `y' `xzcont' `controls' `w', `hdfeabsorb' `vce'
+	reghdfe `y' `xzcont' `controls' `w', `hdfeabsorb' `vce' `cilvl'
 	local coef = r(table)[1,3]
 	local pval = r(table)[4,3]
 }
-if `binarydv'==1 `binarymodel' `y' `xzcont' `controls' `fcontrols_f' `w', `vce'
+if `binarydv'==1 `binarymodel' `y' `xzcont' `controls' `fcontrols_f' `w', `vce' `cilvl'
 est sto regm_cont
 
 
@@ -379,7 +387,7 @@ gen `x'_ci = .
 if "`indslopesmethod'"=="interact" {
 	local count = 0
 	est res regm_fact
-	margins, dydx(`x') at(zbin=(`zlvl')) post
+	margins, dydx(`x') at(zbin=(`zlvl')) post `cilvl'
 	foreach zlvl2 in `zlvl' {
 		local count = `count'+1
 		replace `x'_sl = r(table)[1,`count'] if zbin==`zlvl2'
@@ -393,7 +401,7 @@ if "`indslopesmethod'"=="interact" {
 if "`indslopesmethod'"=="stratify" {
 	foreach zlvl2 in `zlvl' {
 		est res regm_fact`zlvl2'
-		margins, dydx(`x') post
+		margins, dydx(`x') post `cilvl'
 			replace `x'_sl = r(table)[1,1] if zbin==`zlvl2'
 			replace `x'_lci = r(table)[5,1] if zbin==`zlvl2'
 			replace `x'_uci = r(table)[6,1] if zbin==`zlvl2'
@@ -423,7 +431,7 @@ gen `z'_uci = .
 gen `z'_p = .
 
 est res regm_cont
-margins, dydx(`x') at(`z'=(`margat')) `atmean' post
+margins, dydx(`x') at(`z'=(`margat')) `atmean' `cilvl' post
 est sto intmarg 
 foreach num of numlist 1/`margpoints' {
     local mcount = `mcount'+1
@@ -457,11 +465,10 @@ if "`regparameters'"!="" {
 		local zp50 = r(p50)
 		local zp502 = `zp50'+1
 		est res regm_cont
-		margins, dydx(`x') at(`z'=(`zp50' `zp502')) post
+		margins, dydx(`x') at(`z'=(`zp50' `zp502')) `cilvl' post
 		local coef = _b[1._at]-_b[2._at]
 		test _b[1._at] = _b[2._at]
 		local pval = r(p)
-		
 	}
 
 	local siglevel = 99
