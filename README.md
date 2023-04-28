@@ -114,7 +114,7 @@ scatterfit pinc_net age, binned controls(eduyrs) fcontrols(educ emp)
 ```
 <img src="./examples/gr16.png" height="300">
 
-You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the mean of the variables back onto the variables are residualization so that the variables stay on a familiar scale. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
+You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the means of the variables back onto the variables after residualization so that the variables stay on a familiar scale. What you see is the residual variation reletative to the mean. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
 
 ## Regression parameters
 
@@ -135,14 +135,18 @@ The interesting part is that it now becomes possible to plot regression paramete
 ```
 scatterfit redistr pinc_net, binned by(labf) bymethod(interact) regparameters(coef pval sig int) parpos(2.9 2)
 ```
-<img src="./examples/gr17.png" height="300">
+<img src="./examples/gr18.png" height="300">
 
 In this case, for example, it becomes evident that those who are part of the labor force have a significantly stronger slope coefficient of income on support for redistribution.
 
 ## Changing the overall look
 
-While scatterfit comes with a predefined look that differs considerably from the gory Stata standard graphs, the user may prefer a different look. The `plotscheme()` option changes the overall look. Put a Stata native or user-written scheme in the brackets to use it. And `colorscheme()` changes the colors. Either put a defined color palette here, such as s2color or tableau, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). 
+While scatterfit comes with a predefined look that differs considerably from the gory Stata standard graphs, the user may prefer a different look. The `plotscheme()` option changes the overall look. Put a Stata native or user-written scheme in the brackets to use it. And `colorscheme()` changes the colors. Either put a defined color palette here, such as s2color or tableau, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). It is advised that you also change the color palette when you change the overall plot scheme.
 
+```
+scatterfit pinc_net age, binned plotscheme(white_tableau) colorscheme(tableau)
+```
+<img src="./examples/gr19.png" height="300">
 
 # Creating plots with slopefit
 
