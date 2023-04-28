@@ -1,6 +1,6 @@
 # SCATTERFIT v1.6
 
-Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables. `slopefit` is for interaction models and visualizes the relationship between x and y conditional on another variable z.
+Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables and `slopefit` visualizes the relationship between x and y conditional on another variable z.
 
 To install the package, execute the following command in Stata
 
@@ -8,14 +8,14 @@ To install the package, execute the following command in Stata
 net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
 ```
 
-Once installed, please see `help scatterfit` and `help slopefit` for syntax and the whole range of options.
+Once installed, please see `help scatterfit` and `help slopefit` for the syntax and the whole range of options.
 
 There are two tutorials below that showcase the possibilities of the two commands. 
 
 # Creating plots with scatterfit
 ## Basics
 
-Scatterfit uses `graph twoway` to plot (1) scatter points, (2) fit lines, and optionally (3) confidence intervals. The standard syntax is `scatterfit y x [,options]`. In its simplest form, it is essentially a `graph twoway (scatter y x) (lfit y x)` command, although much better looking by default. Let's see it in action, using data from the German European Social Survey sample from 2018-19.
+Scatterfit plots (1) scatter points, (2) fit lines, and optionally (3) confidence intervals. The standard syntax is `scatterfit y x [,options]`. In its simplest form, it is essentially a `graph twoway (scatter y x) (lfit y x)` command, although much better looking by default. Let's see it in action using data from the German European Social Survey sample from 2018-19.
 
 ```
 scatterfit pinc_net age
@@ -35,13 +35,11 @@ The advantages of binned scatter plots should become apparent. You can get a muc
 
 ```
 scatterfit redistr pinc_net
-```
-```
 scatterfit redistr pinc_net, binned
 ```
-<img src="./examples/gr3.png" height="300"><img src="./examples/gr4.png" height="300">
+<img src="./examples/gr3.png" height="200"><img src="./examples/gr4.png" height="200">
 
-By default, the x variable is binned according to quantile cutoff-points so that the data are categorized into (nearly) 20 equally sized groups. Using the `nquantiles()` option changes the number of equally sized groups. 
+By default, the x variable is binned according to quantile cutoff-points so that the data are categorized into 30 (nearly) equally sized groups. Using the `nquantiles()` option changes the number of equally sized bins. 
 
 ```
 scatterfit redistr pinc_net, binned nquantiles(50)
@@ -69,29 +67,29 @@ scatterfit pinc_net age, binned discrete
 ```
 <img src="./examples/gr8.png" height="300">
 
-The last option is to use `binvar()` to define a variable that already contains all the bins.
+The last option is to use `binvar()` to use a variable that already defines all the bins.
 
 ## Binary dependent variables
 
-The command also works with binary dependent variables. It will automatically detect if the y variable only has two distinct values (after accounting for sample reductions via listwise deletion or if/in). No matter the underlying scale, scatterfit will transform the variable into a dummy where the original value with the higher scale point gets the "1" coding. Of course, scatter plots make little sense for binary dependent variables because all points are bundled on 0 and 1. But, you guessed it, binned scatter plots work just fine. The points and fit line show the proportion of respondents in the "1" rather than the "0" category.
+The command also works with binary dependent variables. It will automatically detect if the y variable only has two distinct values (after accounting for sample reductions via listwise deletion and if/in). No matter the underlying scale, scatterfit will transform the variable into a dummy where the original value with the higher scale point gets the "1" coding. Of course, scatter plots make little sense for binary dependent variables because all points are bundled on 0 and 1. But, you guessed it, binned scatter plots work just fine. The points and fit line show the proportion of respondents in the "1" rather than the "0" category.
 
 ```
 scatterfit right pinc_net, binned
 ```
 <img src="./examples/gr9.png" height="300">
 
-The fit line in the binary DV case is derived from linear predictions from a logit model that is calculated internally.
+The fit line in the binary DV case is derived from linear predictions based on a logit model that is calculated internally.
 
 ## Fit types
 
-The command supports several fit lines, manipulated via the `fit()` option. The standard setting is `fit(lfit)` for a linear fit with no confidence intervals. Other possible settings are `fit(lfitci)` to include confidence intervals, `fit(qfit)` or `fit(qfitci)` for quadratic fits, `fit(poly)` or `fit(polyci)` for local polynomial fits, and `fit(lowess)` for a lowess smoother. To control how fine-grained the smoothing is for local polynomials and lowess, use the `bwidth()` option. Here are some examples.
+The command supports several fit lines, manipulated via the `fit()` option. The standard setting is `fit(lfit)` for a linear fit with no confidence intervals. Other possible settings are `fit(lfitci)` to include confidence intervals, `fit(qfit)` or `fit(qfitci)` for quadratic fits, `fit(poly)` or `fit(polyci)` for local polynomial fits, and `fit(lowess)` for a lowess smoother. Use the `bwidth()` option to control how fine-grained the smoothing is for local polynomial and lowess fits. Here are some examples.
 
-<img src="./examples/gr10.png" height="300"><img src="./examples/gr11.png" height="300">
-<img src="./examples/gr12.png" height="300"><img src="./examples/gr13.png" height="300">
+<img src="./examples/gr10.png" height="200"><img src="./examples/gr11.png" height="200">
+<img src="./examples/gr12.png" height="200"><img src="./examples/gr13.png" height="200">
 
 ## Multiple plots along a by-dimension
 
-The values of y can be plotted separately for values across a by-dimension. Here is the development of income by age separately for men and women.
+The relationship between x and y can be broken down so that separate scatter points and fits are plotted for each value of the variable defined in `by()`. Here is the relationship between age and income with separate plots for men and women.
 ```
 scatterfit pinc_net age, binned fit(lfitci) by(gender)
 ```
@@ -105,16 +103,18 @@ scatterfit pinc_net age, binned by(gender) mlabel(genderlab)
 
 ## Control variables
 
-Scatterfit makes it possible to plot scatterplots with fit after accounting for control variables. If at all, researchers mostly use fitted scatterplots as a step preliminary to the "real" data analysis. The results are treated as descriptive, mostly because scatterplots appear insufficient for multivariate analyses. However, this is not the case. The data can be pre-treated before plotting them so that they only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
+Scatterfit makes it possible to plot fitted scatterplots after accounting for control variables. If at all, researchers mostly use fitted scatterplots as a step preliminary to the "real" data analysis. The results are treated as descriptive, mostly because scatterplots are bivariate and, in their simple form, do not consider covariates. 
 
-The `controls()` option is used to control linearly for continuous variables (no factor-notation such as i.x allowed!), and the `fcontrols()` option is used for categorical / factorized variables. So, let's see it in action. 
+Scatterplot can pre-treat the data so that the plots only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
+
+The `controls()` option is used to control linearly for continuous variables (no factor-notation such as i.x allowed!), and the `fcontrols()` option is used for categorical / factorized variables. Let's see it in action!
 
 ```
 scatterfit pinc_net age, binned controls(eduyrs) fcontrols(educ emp)
 ```
 <img src="./examples/gr16.png" height="300">
 
-You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the means of the variables back onto the variables after residualization so that the variables stay on a familiar scale. What you see is the residual variation reletative to the mean. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
+You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the means of the variables back after residualization so that the variables stay on a familiar scale. That is, what you see is the residual variation relative to the mean. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
 
 ## Regression parameters
 
@@ -128,20 +128,20 @@ The program tries to find a good position for the parameters, but this is not al
 
 ## Interaction models
 
-If `by()` is specified, the usual behavior of scatterfit is to stratify the sample and plot the relationship between x and y separately for each by-level. Using the `bymethod(interact)` option rather specifies that the results are obtained from an interaction regression model where x is interacted with the by-factor. When no control variables are specified, this leads to identical results, while the results may vary somewhat in the presence of controls.
+If `by()` is specified, the usual behavior of scatterfit is to stratify the sample and plot the relationship between x and y separately for each by-level. Using the `bymethod(interact)` option specifies that the results are rather obtained from an interaction regression model where x is interacted with each by-factor. When no control variables are specified, this leads to identical results, while the results may vary somewhat in the presence of controls.
 
 The interesting part is that it now becomes possible to plot regression parameters for the interaction(s). Just add the argument 'int' to the `regparameters()` option to receive the specified parameters for the interaction terms as well. 
 
 ```
-scatterfit redistr pinc_net, binned by(labf) bymethod(interact) regparameters(coef pval sig int) parpos(2.9 2)
+scatterfit redistr pinc_net, binned by(labf) bymethod(interact) regparameters(coef pval sig int)
 ```
 <img src="./examples/gr18.png" height="300">
 
-In this case, for example, it becomes evident that those who are part of the labor force have a significantly stronger slope coefficient of income on support for redistribution.
+In this example, it becomes evident that those who are part of the labor force have a significantly stronger slope coefficient of income on support for redistribution.
 
 ## Changing the overall look
 
-While scatterfit comes with a predefined look that differs considerably from the gory Stata standard graphs, the user may prefer a different look. The `plotscheme()` option changes the overall look. Put a Stata native or user-written scheme in the brackets to use it. And `colorscheme()` changes the colors. Either put a defined color palette here, such as s2color or tableau, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). It is advised that you also change the color palette when you change the overall plot scheme.
+While scatterfit comes with a predefined look that differs considerably from the gory Stata standard, the user may prefer a different look. The `plotscheme()` can be used to define an alternative plot scheme. You can use a Stata-native or user-written scheme here. And `colorscheme()` changes the color palette. Either put a pre-defined color palette such as s2color or tableau here, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). It is advised that you also change the color palette when you change the overall plot scheme.
 
 ```
 scatterfit pinc_net age, binned plotscheme(white_tableau) colorscheme(tableau)
@@ -153,6 +153,8 @@ scatterfit pinc_net age, binned plotscheme(white_tableau) colorscheme(tableau)
 
 Slopefit visualizes the relationship between x and y conditional on a continuous variable z. It also creates scatter plots with overlaid fit lines, but in a different way. Both the scatter points and the fit line show the slope (i.e. effect) of x at different values of z. The fit line is derived from a simple interaction model that assumes that the effect of x changes linearly with z. In contrast, the scatter points show effects of x within user-defined bins of z (say, the effect of x at the first decile of z, etc). These individual slopes are derived from an interaction regression model that uses a factorized version of z to get separate slope coefficients for different subsets of z.
 
+The following examples will acquaint you with the basics, but it will be much more brief than the tutorial for scatterfit because the two commands share a lot of functionalities. For example, changing the overall look of the figure works identically in the two commands.
+
 # Basics
 
 There are several methods to create the bins of z. As with scatterfit, the standard setting is to categorize z into equally sized bins based on quantile cutoff points. 
@@ -162,7 +164,7 @@ slopefit pinc_net gender age, method(quantiles) nquantiles(20)
 ```
 <img src="./examples/gr20.png" height="300">
 
-In this example, the fit line shows the results from the continuous interaction model, and the lowest scatter marker shows the effect of x in among those within the bottom 5% of the distribution of z. 
+In this example, the fit line shows the results from the continuous interaction model, and the lowest scatter marker shows the effect of x among those within the bottom 5% of the z distribution. 
 
 Similar to scatterfit, the bins can also be created by sorting z into equally spaced bins.
 
@@ -172,7 +174,7 @@ slopefit pinc_net gender age, method(unibin) nunibin(20)
 ```
 <img src="./examples/gr21.png" height="300">
 
-Or by treating z as discrete and using every single discrete value.
+Or by treating z as discrete and using every single distinct value.
 
 ```
 slopefit redistr pinc_net rile, method(discrete)
@@ -190,14 +192,14 @@ The previous example also shows the `mlabel()` option, which replaces the usual 
 
 ## Confidence intervals and fit lines
 
-The `fit()` option governs options how the main fit line, derived from the linear interaction of x and z, is plotted. You may use lfit, lfitci, qfit, and qfitci. We'll use lfitci here to add confidence intervals to our plot from the previous example.
+The `fit()` option governs options how the main fit line, derived from the linear interaction of x and z, is plotted. You may use 'lfit', 'lfitci', 'qfit', and 'qfitci'. We'll use lfitci here to add confidence intervals to the plot.
 
 ```
 slopefit redistr pinc_net rile, method(discrete) fit(lfitci)
 ```
 <img src="./examples/gr24.png" height="300">
 
-It is also possible to plot the confidence intervals for the individual slopes with ``, in this case at all distinct values of peoples' left-right self-placement.
+It is also possible to plot the confidence intervals of the individual slopes with `indslopesci`, in this case at all distinct values of peoples' left-right self-placement.
 
 ```
 slopefit redistr pinc_net rile, method(discrete) fit(lfitci) indslopesci
