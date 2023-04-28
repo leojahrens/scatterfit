@@ -1,12 +1,15 @@
 # SCATTERFIT v1.6
 
-Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines: scatterfit and slopefit. To install the package, execute the following command in Stata
+Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables. `slopefit` is for interaction models and visualizes the relationship between x and y conditional on another variable z.
+
+To install the package, execute the following command in Stata
 
 ```
 net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
 ```
 
 Once installed, please see `help scatterfit` and `help slopefit` for syntax and the whole range of options.
+
 There are two tutorials below that showcase the possibilities of the two commands. 
 
 # Creating plots with scatterfit
@@ -102,7 +105,52 @@ scatterfit pinc_net age, binned by(gender) mlabel(genderlab)
 
 ## Control variables
 
-Work in progress...
+Scatterfit makes it possible to plot scatterplots with fit after accounting for control variables. If at all, researchers mostly use fitted scatterplots as a step preliminary to the "real" data analysis. The results are treated as descriptive, mostly because scatterplots appear insufficient for multivariate analyses. However, this is not the case. The data can be pre-treated before plotting them so that they only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
+
+The `controls()` option is used to control linearly for continuous variables (no factor-notation such as i.x allowed!), and the `fcontrols()` option is used for categorical / factorized variables. So, let's see it in action. 
+
+```
+scatterfit pinc_net age, binned controls(eduyrs) fcontrols(educ emp)
+```
+<img src="./examples/gr16.png" height="300">
+
+You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the mean of the variables back onto the variables are residualization so that the variables stay on a familiar scale. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
+
+## Regression parameters
+
+The `regparameters()` option allows the user to print parameters from a regression between y and x (and, possibly, covariates) into the plot. Allowed are 'coef' for the slope coefficient, 'se' for its standard error, 'pval' for the p-value of a null-hypothesis test, 'sig' for significance stars on the coefficient (*<.1, **<.05, ***<.01), 'r2' for r-squared, 'adjr2' for adjusted r-squared, and 'nobs' for the number of observations. 
+```
+scatterfit pinc_net age, binned regparameters(coef se pval sig adjr2 nobs) parpos(.9 85)
+```
+<img src="./examples/gr17.png" height="300">
+
+The program tries to find a good position for the parameters, but this is not always successful. In this case, I used the `parpos()` option to specify the position of the text box.
+
+## Interaction models
+
+If `by()` is specified, the usual behavior of scatterfit is to stratify the sample and plot the relationship between x and y separately for each by-level. Using the `bymethod(interact)` option rather specifies that the results are obtained from an interaction regression model where x is interacted with the by-factor. When no control variables are specified, this leads to identical results, while the results may vary somewhat in the presence of controls.
+
+The interesting part is that it now becomes possible to plot regression parameters for the interaction(s). Just add the argument 'int' to the `regparameters()` option to receive the specified parameters for the interaction terms as well. 
+
+```
+scatterfit redistr pinc_net, binned by(labf) bymethod(interact) regparameters(coef pval sig int) parpos(2.9 2)
+```
+<img src="./examples/gr17.png" height="300">
+
+In this case, for example, it becomes evident that those who are part of the labor force have a significantly stronger slope coefficient of income on support for redistribution.
+
+## Changing the overall look
+
+While scatterfit comes with a predefined look that differs considerably from the gory Stata standard graphs, the user may prefer a different look. The `plotscheme()` option changes the overall look. Put a Stata native or user-written scheme in the brackets to use it. And `colorscheme()` changes the colors. Either put a defined color palette here, such as s2color or tableau, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). 
+
+
+# Creating plots with slopefit
+
+Work in progress
+
+
+
+
 
 
 
