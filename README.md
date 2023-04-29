@@ -1,9 +1,13 @@
 # SCATTERFIT v1.6
 
-Scatterfit includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables and `slopefit` visualizes the relationship between x and y conditional on another variable z.
+The package includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables x and y and `slopefit` visualizes the relationship between x and y conditional on another continuous variable z.
 
-To install the package, execute the following command in Stata
+The package can be installed from SSC by executing in Stata:
+```
+ssc install scatterfit, replace
+```
 
+Or download straight from GitHub:
 ```
 net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
 ```
@@ -12,7 +16,7 @@ Once installed, please see `help scatterfit` and `help slopefit` for the syntax 
 
 There are two tutorials below that showcase the possibilities of the two commands. 
 
-# Creating plots with scatterfit
+# Tutorial for scatterfit
 ## Basics
 
 Scatterfit plots (1) scatter points, (2) fit lines, and optionally (3) confidence intervals. The standard syntax is `scatterfit y x [,options]`. In its simplest form, it is essentially a `graph twoway (scatter y x) (lfit y x)` command, although much better looking by default. Let's see it in action using data from the German European Social Survey sample from 2018-19.
