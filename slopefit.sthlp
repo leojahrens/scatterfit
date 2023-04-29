@@ -59,7 +59,8 @@ yvar xvar zvar {ifin}
 {synopt :{opt stand:ardize}}Standardizes {it:xvar} and {it:yvar} to a standard deviation of one and a mean of zero.{p_end}
 {synopt :{opt legin:side}}Places the legend inside the plot region.{p_end}
 {synopt :{opt opts(str)}}Passes on options to the twoway plot. For example, {opt opts(xtitle("Example"))} changes the x axis title. See {opt help twoway}.{p_end}
-{synopt :{opt binarym:odel(str)}}Specifies the regression model used for binary dependent variables. Must be {it:logit} or {it:probit}.
+{synopt :{opt binarym:odel(str)}}Specifies the regression model used for binary dependent variables. Must be {it:logit} or {it:probit}.{p_end}
+{synopt :{opt noy:line}}Removes the line at y=0.{p_end}
 
 
 {title:Examples}
