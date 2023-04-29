@@ -63,7 +63,7 @@ scatterfit pinc_net age, binned discrete
 Use the `mweighted` option to visualize the differing amount of observations within the bins.
 
 ```
-scatterfit pinc_net age, binned discrete
+scatterfit pinc_net age, binned discrete mweighted
 ```
 <img src="./examples/gr8.png" height="300">
 
@@ -105,7 +105,7 @@ scatterfit pinc_net age, binned by(gender) mlabel(genderlab)
 
 Scatterfit makes it possible to plot fitted scatterplots after accounting for control variables. If at all, researchers mostly use fitted scatterplots as a step preliminary to the "real" data analysis. The results are treated as descriptive, mostly because scatterplots are bivariate and, in their simple form, do not consider covariates. 
 
-Scatterplot can pre-treat the data so that the plots only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
+`scatterfit` can pre-treat the data so that the plots only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
 
 The `controls()` option is used to control linearly for continuous variables (no factor-notation such as i.x allowed!), and the `fcontrols()` option is used for categorical / factorized variables. Let's see it in action!
 
@@ -155,7 +155,7 @@ Slopefit visualizes the relationship between x and y conditional on a continuous
 
 The following examples will acquaint you with the basics, but it will be much more brief than the tutorial for scatterfit because the two commands share a lot of functionalities. For example, changing the overall look of the figure works identically in the two commands.
 
-# Basics
+## Basics
 
 There are several methods to create the bins of z. As with scatterfit, the standard setting is to categorize z into equally sized bins based on quantile cutoff points. 
 
@@ -181,7 +181,7 @@ slopefit redistr pinc_net rile, method(discrete)
 ```
 <img src="./examples/gr22.png" height="300">
 
-The last variant to create the bins of z is to use a user-defined binning variable that already exists in the dataset. In the following example, I will use multi-country survey data from the ESS and define the individual countries as the bins. In effect, the scatter markers show the individual slope coefficients for the each country in the sample. 
+The last variant to create the bins of z is to use a user-defined binning variable that already exists in the dataset. In the following example, I will use multi-country survey data from the ESS and define the individual countries as the bins via `binvar()`. In effect, the scatter markers show the individual slope coefficients for the each country in the sample. 
 
 ```
 slopefit gincdif hinctnta rilemean, binvar(cntry) mlabel(cntry)
