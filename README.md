@@ -1,25 +1,25 @@
 # SCATTERFIT v1.6
 
-The package includes two commands for Stata that produce a wide range of scatter plots with overlaid fit lines. `scatterfit` visualizes the relationship between two variables x and y and `slopefit` visualizes the relationship between x and y conditional on another continuous variable z.
+This is a Stata package that produces a wide range of scatter plots with overlaid fit lines. It comes with two commands: `scatterfit` visualizes the relationship between two variables x and y and `slopefit` visualizes the relationship between x and y conditional on another continuous variable z.
 
-The package can be installed from SSC by executing in Stata:
-```
-ssc install scatterfit, replace
-```
-
-Or download straight from GitHub:
+The package can be installed by executing in Stata:
 ```
 net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
 ```
 
+Or download from SSC:
+```
+ssc install scatterfit, replace
+```
+
 Once installed, please see `help scatterfit` and `help slopefit` for the syntax and the whole range of options.
 
-There are two tutorials below that showcase the possibilities of the two commands. 
+There are two tutorials below that showcase the possibilities of the commands. 
 
 # Tutorial for scatterfit
 ## Basics
 
-Scatterfit plots (1) scatter points, (2) fit lines, and optionally (3) confidence intervals. The standard syntax is `scatterfit y x [,options]`. In its simplest form, it is essentially a `graph twoway (scatter y x) (lfit y x)` command, although much better looking by default. Let's see it in action using data from the German European Social Survey sample from 2018-19.
+Scatterfit plots scatter points, fit lines, and optionally confidence intervals. The standard syntax is `scatterfit y x [,options]`. In its simplest form, it is essentially a `graph twoway (scatter y x) (lfit y x)` command, although much better looking by default. Let's see it in action using data from the German European Social Survey sample from 2018-19.
 
 ```
 scatterfit pinc_net age
@@ -111,7 +111,7 @@ Scatterfit makes it possible to plot fitted scatterplots after accounting for co
 
 `scatterfit` can pre-treat the data so that the plots only show the residual covariation between x and y after accounting for control variables. This is achieved by first regressing the x and y variables on the control variables and then using the residuals for the plots. If binned scatterplots are involved, this becomes slightly more complicated; see "Cattaneo et al. 2022 - On Binscatter". Scatterfit uses the simple residualization method for all plots without bins and the Cattaneo et al. method for all binned scatterplots.
 
-The `controls()` option is used to control linearly for continuous variables (no factor-notation such as i.x allowed!), and the `fcontrols()` option is used for categorical / factorized variables. Let's see it in action!
+Use the `controls()` option to control linearly for continuous variables and the `fcontrols()` option for categorical / factorized variables, such as education level. Let's see it in action!
 
 ```
 scatterfit pinc_net age, binned controls(eduyrs) fcontrols(educ emp)
@@ -153,7 +153,7 @@ scatterfit pinc_net age, binned plotscheme(white_tableau) colorscheme(tableau)
 <img src="./examples/gr19.png" height="300">
 
 
-# Creating plots with slopefit
+# Tutorial for slopefit
 
 Slopefit visualizes the relationship between x and y conditional on a continuous variable z. It also creates scatter plots with overlaid fit lines, but in a different way. Both the scatter points and the fit line show the slope (i.e. effect) of x at different values of z. The fit line is derived from a simple interaction model that assumes that the effect of x changes linearly with z. In contrast, the scatter points show effects of x within user-defined bins of z (say, the effect of x at the first decile of z, etc). These individual slopes are derived from an interaction regression model that uses a factorized version of z to get separate slope coefficients for different subsets of z.
 
@@ -209,12 +209,6 @@ It is also possible to plot the confidence intervals of the individual slopes wi
 slopefit redistr pinc_net rile, method(discrete) fit(lfitci) indslopesci
 ```
 <img src="./examples/gr25.png" height="300">
-
-Lastly, the `vce()` option changes the calculation of the standard errors in the underlying regressions, which influences all uncertainty estimates.
-
-```
-slopefit redistr pinc_net rile, method(discrete) fit(lfitci) indslopesci vce(robust)
-```
 
 ## Control variables
 
