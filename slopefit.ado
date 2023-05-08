@@ -1,7 +1,7 @@
-*! version 1.6.1   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.2   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
-version 13.1
+version 14.2
 	
 *-------------------------------------------------------------------------------
 * syntax and options
@@ -510,7 +510,7 @@ if "`regparameters'"!="" {
 			local `par' "<.00001"
 		}
 		else {
-			local `par' "{&cong} 0"
+			local `par' "{&cong}0"
 		}
 		if strpos("``par''","000000") & "``par''"!="<.00001" {
 			foreach zz of numlist 1/9 {
@@ -783,8 +783,8 @@ if "`regparameters'"!="" {
 			if `siglevel'==.05 local sigstar **
 			if `siglevel'==.01 local sigstar ***
 		}
-		if `binarydv'==0 local whatcoef {it:{&delta}ß/{&delta}x}
-		if `binarydv'==1 local whatcoef {it:{&delta}ß/{&delta}x}
+		if `binarydv'==0 local whatcoef {it:{&delta}{&beta}/{&delta}x}
+		if `binarydv'==1 local whatcoef {it:{&delta}{&beta}/{&delta}x}
 		local coefpar `whatcoef'`coef'`sigstar'
 	}
 	* p value

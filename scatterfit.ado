@@ -1,7 +1,7 @@
-*! version 1.6.1   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.2   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
-version 13.1
+version 14.2
 	
 *-------------------------------------------------------------------------------
 * syntax and options
@@ -543,7 +543,7 @@ if "`regparameters'"!="" {
 			local `par' "<.00001"
 		}
 		else {
-			local `par' "{&cong} 0"
+			local `par' "{&cong}0"
 		}
 		if strpos("``par''","000000") & "``par''"!="<.00001" {
 			foreach zz of numlist 1/9 {
@@ -995,7 +995,7 @@ if "`regparameters'"!="" {
 				local sepvalpar`bynum2' " (`separ`bynum2''`leerz'`pvalpar`bynum2'')"
 			}
 			
-			if `binarydv'==0 local whatcoef {it:ß`parbylab`bynum2''}
+			if `binarydv'==0 local whatcoef {it:{&beta}`parbylab`bynum2''}
 			if `binarydv'==1 local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}
 			local coefpar`bynum2' `whatcoef'`coef`bynum2''`sigstar`bynum2''
 			local jcoefpar`bynum2' `coefpar`bynum2''`sepvalpar`bynum2''
@@ -1022,7 +1022,7 @@ if "`regparameters'"!="" {
 								if `siglevel`bynum2'_`bynum3''==.01 local sigstar`bynum2'_`bynum3' ***
 							}
 							if strpos("`regparameters'","pval") local intpvalpar`bynum2'_`bynum3' " ({it:p}`pval`bynum2'_`bynum3'')"
-							if `binarydv'==0 local whatcoef {it:ß`parbylab`bynum2''}-{it:ß`parbylab`bynum3''}
+							if `binarydv'==0 local whatcoef {it:{&beta}`parbylab`bynum2''}-{it:ß`parbylab`bynum3''}
 							if `binarydv'==1 local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}-{it:{&delta}Pr/{&delta}x`parbylab`bynum3''}
 							
 							local intcoefpar`bynum2'_`bynum3' `whatcoef'`coef`bynum2'_`bynum3''`sigstar`bynum2'_`bynum3''`intpvalpar`bynum2'_`bynum3''
