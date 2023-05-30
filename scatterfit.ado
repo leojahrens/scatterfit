@@ -1049,7 +1049,7 @@ if "`regparameters'"!="" {
 		foreach ee in `coefsepvalparcollect' {
 			local coefpar `" `coefpar' "`coef`ee''" "'
 			if strpos("`regparameters'","se") local coefpar `" `coefpar' "`se`ee''" "'
-			if strpos("`regparameters'","se") local coefpar `" `coefpar' "`pval`ee''" "'
+			if strpos("`regparameters'","pval") local coefpar `" `coefpar' "`pval`ee''" "'
 		}
 	}
 
@@ -1213,7 +1213,6 @@ tw `sce' `sc' `ci' `pl', `lscatteropts'
 restore
 }
 end
-
 
 
 
