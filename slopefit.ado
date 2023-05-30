@@ -1,4 +1,4 @@
-*! version 1.6.2   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.3   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 14.2

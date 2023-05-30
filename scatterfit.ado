@@ -1,7 +1,7 @@
-*! version 1.6.2   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.3   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
-version 14.2
+version 15
 	
 *-------------------------------------------------------------------------------
 * syntax and options
@@ -182,8 +182,8 @@ if "`regparameters'"!="" {
 		dis as error "Regression parameters can only be plotted for a linear fit."
 		exit 498
 	}
-	if strpos("`regparameters'","sig") & !strpos("`regparameters'","coef") {
-		dis as error "{bf:regparameters({it:sig})} requires {bf:regparameters({it:coef})}"
+	if (strpos("`regparameters'","sig") | strpos("`regparameters'","pval") | strpos("`regparameters'","se")) & !strpos("`regparameters'","coef") {
+		dis as error "{bf:regparameters({it:sig})}, {bf:regparameters({it:se})}, and {bf:regparameters({it:pval})} can only be used together with {bf:regparameters({it:coef})}"
 		exit 498
 	}
 	if strpos("`regparameters'","int") & "`bymethod'"!="interact" {
@@ -977,7 +977,7 @@ if "`regparameters'"!="" {
 			if `binarydv'==1 local adjr2par `adjr2par' {it:Pseudo R2`parbylabn`bynum2''}`r2`bynumname''
 		}
 		* observations 
-		if strpos("`regparameters'","nobs") local nobspar "`nobspar' {it:N`parbylabn`bynum2''}`nobs`bynumname''"
+		if strpos("`regparameters'","nobs") local nobspar `nobspar' {it:N`parbylabn`bynum2''}`nobs`bynumname''
 	}
 
 	foreach bynum2 in `bynum' {
@@ -1048,8 +1048,8 @@ if "`regparameters'"!="" {
 	else {
 		foreach ee in `coefsepvalparcollect' {
 			local coefpar `" `coefpar' "`coef`ee''" "'
-			local coefpar `" `coefpar' "`se`ee''" "'
-			local coefpar `" `coefpar' "`pval`ee''" "'
+			if strpos("`regparameters'","se") local coefpar `" `coefpar' "`se`ee''" "'
+			if strpos("`regparameters'","se") local coefpar `" `coefpar' "`pval`ee''" "'
 		}
 	}
 
