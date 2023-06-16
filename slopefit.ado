@@ -1,7 +1,7 @@
-*! version 1.6.3   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.4   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
-version 14.2
+version 15
 	
 *-------------------------------------------------------------------------------
 * syntax and options
@@ -181,7 +181,10 @@ if "`controls'`fcontrols'"!="" | "`binvar'"!="" | "`mlabel'"!="" {
 drop if mi(`x') | mi(`y') | mi(`z') `covdrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
-keep `x' `y' `z' `controls' `fcontrols' `binvar' `mlabel' `weightname'
+if strpos("`vce'","cluster") {
+	local clustervar: subinstr local vce "cluster" "", all
+}
+keep `x' `y' `z' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
 
 
 *-------------------------------------------------------------------------------

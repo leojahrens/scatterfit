@@ -1,4 +1,4 @@
-*! version 1.6.3   Leo Ahrens   leo@ahrensmail.de
+*! version 1.6.4   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -214,7 +214,10 @@ if "`by'"!="" local bydrop | mi(`by')
 drop if mi(`x') | mi(`y') `covdrop' `bydrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
-keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname'
+if strpos("`vce'","cluster") {
+	local clustervar: subinstr local vce "cluster" "", all
+}
+keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
 
 
 *-------------------------------------------------------------------------------
