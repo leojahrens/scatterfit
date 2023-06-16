@@ -182,7 +182,7 @@ drop if mi(`x') | mi(`y') | mi(`z') `covdrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
 if strpos("`vce'","cluster") {
-	local clustervar: subinstr local clustervar "cluster" "", all
+	local clustervar: subinstr local vce "cluster" "", all
 }
 keep `x' `y' `z' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
 
