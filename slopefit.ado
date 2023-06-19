@@ -1,4 +1,4 @@
-*! version 1.6.4   Leo Ahrens   leo@ahrensmail.de
+*! version 1.7   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 15
@@ -17,6 +17,7 @@ INDSLOPESMethod(string) indslopesci
 Controls(varlist) Fcontrols(varlist)     
 BINARYModel(string)
 REGParameters(string) PARPos(string) PARSize(string)
+ZDISTRibution(string asis) zdistrbw(numlist max=1)
 vce(string) Level(numlist max=1)
 JITter(numlist max=1)
 STANDardize 
@@ -162,6 +163,25 @@ if "`regparameters'"!="" {
 if "`parpos'"!="" & "`regparameters'"=="" {
 	di as error "The parpos() option requires the regparameters() option."
 	exit 498
+}
+
+// z distribution 
+if "`zdistribution'"!="" {
+	if "`zdistribution'"=="auto" {
+	    local zdcorrect = 1
+	}
+	else {
+		local zdcorrect = 1
+	    tokenize `zdistribution'
+		if !regexm("`1'", "^[0-9.]+$") | !regexm("`2'", "^[0-9.]+$") local zdcorrect = 0
+		foreach token of numlist 3/9 {
+		    if "``token''"!="" local zdcorrect = 0
+		}
+	} 
+	if `zdcorrect'==0 {
+		di as error "The zdistribution() option must be set either to zdistribution(auto) or zdistribution(a b), where both a and b are numbers."
+		exit 498
+	}
 }
 
 
@@ -585,6 +605,7 @@ if "`plotscheme'"=="" {
 		local mlines`i' lc(`c`i'') lw(medthick)
 		local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
 		local ciareas`i' lw(none) fc(`c`i'o30')
+		local xdistareas`i' lw(none) fc(`c`i'o50')
 		local cicap`i' lw(medium) lc(`c`i'o50') lp(solid)
 		local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlabc(`c`i'') mlw(thin)
 		local efullscatterm`i' `mfullscatterm`i''
@@ -833,20 +854,54 @@ if strpos("`fit'","qfit") local leg_fit Quadratic
 local addmarkercis = 0
 local addemptymark = 0
 local add95cis = 0
+local addzdistr = 0
 if "`indslopesci'"!="" local addmarkercis = `zbinlength'
 if "`mweighted'"!="" local addemptymark = 1
+if "`zdistribution'"!="" local addzdistr = 1
 if strpos("`fit'","ci") local add95cis = 1
 foreach i of numlist 1/3 {
-	local n`i' = `i'+`addmarkercis'
-	local nn`i' = `i'+`addmarkercis'+`addemptymark'
-	local nnn`i' = `i'+`addmarkercis'+`addemptymark'+`add95cis'
+    local m`i' = `i'+`addzdistr'
+	local n`i' = `i'+`addzdistr'+`addmarkercis'
+	local nn`i' = `i'+`addzdistr'+`addmarkercis'+`addemptymark'
+	local nnn`i' = `i'+`addzdistr'+`addmarkercis'+`addemptymark'+`add95cis'
 }
 if "`mlabel'"=="" local legindslopes `n1' "Individual slopes"
-if "`indslopesci'"!="" local legindsl 1 "95% CIs"
+if "`indslopesci'"!="" local legindsl `m1' "95% CIs"
 if strpos("`fit'","ci") local legci95 `nn2' "95% CIs"
 
 local legopts `legopts' legend(order(`legindslopes' `legindsl' `nnn2' "`leg_fit' slope fit" `legci95'))
-dis `""`legopts'""'
+
+
+*-------------------------------------------------------------------------------
+* distribution plot of z variable
+*-------------------------------------------------------------------------------
+
+if "`zdistribution'"!="" {
+
+	// prep settings
+	if "`zdistribution'"=="auto" {
+	    sum `y'_plot
+		local zdheight = (r(max)-r(min))/5
+		local zdpos = r(min)-((r(max)-r(min))/5)
+	}
+	else {
+	    tokenize `zdistribution'
+		local zdheight `2'
+		local zdpos `1'
+	}
+	if "`zdistrbw'"!="" local zdistrbw bw(`zdistrbw')
+	
+	// generate the kernel distribution
+	kdensity `z' `w', generate(hz hy) n(2000) nograph `zdistrbw'
+	gen hbot = 0 if !mi(`z')
+	local gmax = 0
+	sum hy, meanonly
+	if r(max)>`gmax' local gmax = r(max)
+	replace hy = (hy/`gmax')*`zdheight'
+	replace hy = hy+`zdpos'
+	replace hbot = hbot+`zdpos'
+
+}
 
 *-------------------------------------------------------------------------------
 * overall plot size
@@ -890,6 +945,9 @@ if "`mweighted'"!="" {
 	local sce `sce' (scatter `y'_plot `z'_plot if mi(`y'_plot), ``escattermarkers'2')
 }
 
+// density of z variable 
+if "`zdistribution'"!="" local zdistr `zdistr' (rarea hy hbot hz, `xdistareas2')
+
 // cis for individual slopes
 *local isl `isl' (line `x'_lci `x'_uci , `cicap2')
 foreach zlvl2 in `zlvl' {
@@ -905,7 +963,7 @@ if strpos("`fit'","ci") local ci `ci' (rarea `z'_lci `z'_uci `z'_at, `ciareas1')
 local pl `pl' (line `z'_sl `z'_at, `o1')
 
 // draw the final plot
-tw `isl' `sce' `sc' `ci' `pl', `lscatteropts'
+tw `zdistr' `isl' `sce' `sc' `ci' `pl', `lscatteropts'
 	
 
 	

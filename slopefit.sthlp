@@ -43,6 +43,10 @@ yvar xvar zvar {ifin}
 {synopt :{opt ml:abel(var)}}Uses the strings / value labels stored in {it:var} as scatter markers instead of the usual circles, diamonds, etc.{p_end}
 {synopt :{opt jit:ter(num)}}Randomly varies the location of scatter points.{p_end}
 
+{syntab:Distribution of z variable}
+{synopt :{opt zdistr:ibution(string)}}Adds a kernel density plot of {it:zvar}. May be set to {it:auto} or {it:a b}, where {it:a} contains the position and {it:b} the height of the density.{p_end}
+{synopt :{opt zdistrbw(num)}}Specifies the bandwidth of the kernel density estimator.{p_end}
+
 {syntab:Scheme and colors}
 {synopt :{opt plots:cheme(str)}}Defines an alternative graph scheme, such as {opt plotscheme(white_tableau)}. See the collection in https://github.com/asjadnaqvi/stata-schemepack.{p_end}
 {synopt :{opt col:orscheme(str)}}Defines a custom color palette (e.g. {opt colorscheme(tableau)}). To define your own colors, use a list of hex colors (e.g. {opt colorscheme(#E6007E #009FE3 #312783)}).{p_end}

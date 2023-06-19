@@ -1,4 +1,4 @@
-*! version 1.6.4   Leo Ahrens   leo@ahrensmail.de
+*! version 1.7   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -17,6 +17,7 @@ BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist m
 Controls(varlist) Fcontrols(varlist)     
 BINARYModel(string)
 REGParameters(string) PARPos(string) PARSize(string)
+XDISTRibution(string asis) xdistrbw(numlist max=1)
 vce(string) Level(numlist max=1)
 JITter(numlist max=1)
 STANDardize 
@@ -194,6 +195,25 @@ if "`regparameters'"!="" {
 if "`parpos'"!="" & "`regparameters'"=="" {
 	di as error "The parpos() option requires the regparameters() option."
 	exit 498
+}
+
+// x distribution 
+if "`xdistribution'"!="" {
+	if "`xdistribution'"=="auto" {
+	    local xdcorrect = 1
+	}
+	else {
+		local xdcorrect = 1
+	    tokenize `xdistribution'
+		if !regexm("`1'", "^[0-9.]+$") | !regexm("`2'", "^[0-9.]+$") local xdcorrect = 0
+		foreach token of numlist 3/9 {
+		    if "``token''"!="" local xdcorrect = 0
+		}
+	} 
+	if `xdcorrect'==0 {
+		di as error "The xdistribution() option must be set either to xdistribution(auto) or xdistribution(a b), where both a and b are numbers."
+		exit 498
+	}
 }
 
 
@@ -728,6 +748,7 @@ if "`plotscheme'"=="" {
 		local mlines`i' lc(`c`i'') lw(medthick)
 		local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
 		local ciareas`i' lw(none) fc(`c`i'o30')
+		local xdistareas`i' lw(none) fc(`c`i'o50')
 		local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlabc(`c`i'') mlw(thin)
 		local efullscatterm`i' `mfullscatterm`i''
 		if `i'<5 local howthin mlw(vthin)
@@ -1092,11 +1113,14 @@ if strpos("`fit'","lowess") local leg_fit Lowess
 
 foreach ii of numlist 1/4 {
     local n`ii' = `ii'
+	local m`ii' = `ii'
 	if "`mweighted'"!="" local n`ii' = `n`ii''+1
+	if "`xdistribution'"!="" local n`ii' = `n`ii''+1
+	if "`xdistribution'"!="" local m`ii' = `m`ii''+1
 }
 
 if `isthereby'==0 {
-	if "`mlabel'"=="" local firstlegel 1 "`leg_obs'" 
+	if "`mlabel'"=="" local firstlegel `m1' "`leg_obs'" 
 	if !strpos("`fit'","ci") {
 		local legopts `legopts' legend(order(`firstlegel' `n2' "`leg_fit' fit"))
 	}
@@ -1115,6 +1139,7 @@ if `isthereby'==1 {
 		if `isbyvarlabeled'==1 local legbyvarl`bynum2' `bylab`bynum2''
 		if `isbyvarlabeled'==0 local legbyvarl`bynum2' `by'==`bynum2'
 		local coln = `coln'+1
+		local colncopy = `coln'
 		if `ownpred_plot'==0 {
 		    if strpos("`fit'","ci") local ciadd "+`coln'"
 			local coln2 = `coln'+`maxdistinctby'`ciadd'
@@ -1124,7 +1149,11 @@ if `isthereby'==1 {
 			local coln2 = `coln'+`maxdistinctby'`ciadd'
 		}
 		if "`mweighted'"!="" local coln2 = `coln2'+`maxdistinctby'
-		if "`mlabel'"=="" local legorder `legorder' `coln' "`legbyvarl`bynum2''" `coln2' ""
+		if "`xdistribution'"!="" {
+			local colncopy = `coln'+`maxdistinctby'
+			local coln2 = `coln2'+`maxdistinctby'
+		}
+		if "`mlabel'"=="" local legorder `legorder' `colncopy' "`legbyvarl`bynum2''" `coln2' ""
 		if "`mlabel'"!="" local legorder `legorder' `coln2' "`legbyvarl`bynum2''"
 	}
 	if "`mlabel'"=="" local legcol 2
@@ -1132,6 +1161,39 @@ if `isthereby'==1 {
 	local legopts `legopts' legend(order(`legorder') col(`legcol') textfirst)
 }
 
+
+*-------------------------------------------------------------------------------
+* distribution plot of x variable
+*-------------------------------------------------------------------------------
+
+if "`xdistribution'"!="" {
+
+	// prep settings
+	if "`xdistribution'"=="auto" {
+	    sum `yplot'
+		local xdheight = (r(max)-r(min))/5
+		local xdpos = r(min)-((r(max)-r(min))/5)
+	}
+	else {
+	    tokenize `xdistribution'
+		local xdheight `2'
+		local xdpos `1'
+	}
+	if "`xdistrbw'"!="" local xdistrbw bw(`xdistrbw')
+	
+	// generate the kernel distribution
+	foreach bynum2 in `bynum' {
+		kdensity `x' if `by'==`bynum2' `w', generate(hx`bynum2' hy`bynum2') n(2000) nograph `xdistrbw'
+		gen hbot`bynum2' = 0 if !mi(`x') & `by'==`bynum2'
+		local gmax = 0
+		sum hy`bynum2', meanonly
+		if r(max)>`gmax' local gmax = r(max)
+		replace hy`bynum2' = (hy`bynum2'/`gmax')*`xdheight'
+		replace hy`bynum2' = hy`bynum2'+`xdpos'
+		replace hbot`bynum2' = hbot`bynum2'+`xdpos'
+	}
+	
+}
 
 *-------------------------------------------------------------------------------
 * overall plot size
@@ -1185,7 +1247,14 @@ local coln = 0
 foreach bynum2 in `bynum' {
 	local coln = `coln'+1
 	local coln2 = `coln'
-	if `isthereby'==0 local coln2 = `coln'+1
+	local coln3 = `coln'
+	if `isthereby'==0 {
+	    local coln2 = `coln'+1
+		local coln3 = `coln'+2
+	}
+	
+	* density of x variable 
+	if "`xdistribution'"!="" local xdistr `xdistr' (rarea hy`bynum2' hbot`bynum2' hx`bynum2', `xdistareas`coln2'')
 	
 	* scatter points
 	local sc `sc' (scatter `yplot' `xplot' if `by'==`bynum2' `scw', ``mscattermarkers'`coln2'' `markerlab' `jitter')
@@ -1204,7 +1273,7 @@ foreach bynum2 in `bynum' {
 }
 
 // draw the final plot
-tw `sce' `sc' `ci' `pl', `lscatteropts'
+tw `xdistr' `sce' `sc' `ci' `pl', `lscatteropts'
 
 
 
