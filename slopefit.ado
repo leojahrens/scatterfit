@@ -1,4 +1,4 @@
-*! version 1.7   Leo Ahrens   leo@ahrensmail.de
+*! version 1.7.1   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 15
@@ -104,8 +104,8 @@ if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit")
 	di as error "{bf:binarymodel()} must contain logit or probit."
 	exit 498
 }
-qui levelsof `y' `if', local(yval)
-local yvalcount: word count `yval'
+gduplicates report `y' `if'
+local yvalcount = r(unique_value)
 if "`binarymodel'"!="" & `yvalcount'!=2 {
 	di as error "Logit/probit models require a binary dependent variable."
 	exit 498

@@ -1,4 +1,4 @@
-*! version 1.7   Leo Ahrens   leo@ahrensmail.de
+*! version 1.7.1   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -107,8 +107,8 @@ if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit")
 	di as error "{bf:binarymodel()} must contain logit or probit."
 	exit 498
 }
-qui levelsof `y' `if', local(yval)
-local yvalcount: word count `yval'
+gduplicates report `y' `if'
+local yvalcount = r(unique_value)
 if `yvalcount'==2 {
 	if "`controls'`fcontrols'"!="" {
 		di as error "The use of covariates with a binary dependent variable is not supported."
