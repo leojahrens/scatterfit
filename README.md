@@ -1,4 +1,4 @@
-# SCATTERFIT v1.6
+# SCATTERFIT v1.8
 
 This is a Stata package that produces a wide range of scatter plots with overlaid fit lines. It comes with two commands: `scatterfit` visualizes the relationship between two variables x and y and `slopefit` visualizes the relationship between x and y conditional on another continuous variable z.
 
@@ -84,26 +84,35 @@ scatterfit right pinc_net, binned
 
 The fit line in the binary DV case is derived from linear predictions based on a logit model that is calculated internally.
 
-## Fit types
+## Fit line
 
-The command supports several fit lines, manipulated via the `fit()` option. The standard setting is `fit(lfit)` for a linear fit with no confidence intervals. Other possible settings are `fit(lfitci)` to include confidence intervals, `fit(qfit)` or `fit(qfitci)` for quadratic fits, `fit(poly)` or `fit(polyci)` for local polynomial fits, and `fit(lowess)` for a lowess smoother. Use the `bwidth()` option to control how fine-grained the smoothing is for local polynomial and lowess fits. Here are some examples.
+The command supports several fit lines, manipulated via the `fit()` option. The standard setting is `fit(linear)` for a linear fit with no confidence intervals. Other possible settings are `fit(quadratic)` for a second polynomial, `fit(cubic)` for a third polynomial, `fit(lpoly)` for a local polynomial fit, and `fit(lowess)` for a lowess smoother. Use the `bwidth()` option to control how fine-grained the smoothing is for local polynomial and lowess fits. Here are some examples.
 
 <img src="./examples/gr10.png" height="200"><img src="./examples/gr11.png" height="200">
 <img src="./examples/gr12.png" height="200"><img src="./examples/gr13.png" height="200">
+
+Confidence intervals can be included via the `ci` option. The standard are 95% confidence intervals, but this can be changed via the `level()` option. Different standard errors can be set with `vce()`.
+
+```
+scatterfit pinc_net age, binned ci
+```
+<img src="./examples/gr14.png" height="300">
+
+It is also possible to change the regression model used to derive the fit line and confidence intervals using the `fitmodel()` option. The standard is OLS for continuous dependent variables and logit for binary dependent variables. Further possible models are: `fitmodel(poisson)` for a poisson regression for count data, `fitmodel(quantile)` for quantile regression, `fitmodel(randomint, cluster(x))` for a multilevel model with random intercepts (where 'x' is the higher-level cluster variable), and `fitmodel(flogit)` and `fitmodel(fprobit)` for fractional logit/probit models. For binary dependent variables, `fitmodel(logit)`, `fitmodel(probit)`, and `fitmodel(lpm)` for a linear probability model are supported.
 
 ## Multiple plots along a by-dimension
 
 The relationship between x and y can be broken down so that separate scatter points and fits are plotted for each value of the variable defined in `by()`. Here is the relationship between age and income with separate plots for men and women.
 ```
-scatterfit pinc_net age, binned fit(lfitci) by(gender)
+scatterfit pinc_net age, binned ci by(gender)
 ```
-<img src="./examples/gr14.png" height="300">
+<img src="./examples/gr15.png" height="300">
 
 This is also a good opportunity to showcase the `mlabel()` option, which replaces the usual scatter markers with a string contained in a separate string variable or a numeric variable with labeled values.
 ```
 scatterfit pinc_net age, binned by(gender) mlabel(genderlab)
 ```
-<img src="./examples/gr15.png" height="300">
+<img src="./examples/gr16.png" height="300">
 
 ## Control variables
 
@@ -116,7 +125,7 @@ Use the `controls()` option to control linearly for continuous variables and the
 ```
 scatterfit pinc_net age, binned controls(eduyrs) fcontrols(educ emp)
 ```
-<img src="./examples/gr16.png" height="300">
+<img src="./examples/gr17.png" height="300">
 
 You will see that, even though the variables are residualized, both x and y appear to be on their original scale. This is because scatterfit adds the means of the variables back after residualization so that the variables stay on a familiar scale. That is, what you see is the residual variation relative to the mean. If you are unhappy with this behavior, use the `standardize` option to z-standardize both x and y in the plot.
 
@@ -126,9 +135,19 @@ The `regparameters()` option allows the user to print parameters from a regressi
 ```
 scatterfit pinc_net age, binned regparameters(coef se pval sig adjr2 nobs) parpos(.9 85)
 ```
-<img src="./examples/gr17.png" height="300">
+<img src="./examples/gr18.png" height="300">
 
 The program tries to find a good position for the parameters, but this is not always successful. In this case, I used the `parpos()` option to specify the position of the text box.
+
+## Distribution of the independent variable
+
+The option `xdistribution()` includes a kernel density plot that shows the distribution of the x-variable in the plot. Setting it to `xdistribution(auto)` will have scatterfit automatically look for an appropiate position and height of the density. While this is great for quick plotting, using `xdistribution(a b)` allows the use to input their own baseline position and height, where a is the position and b the height. The option is especially helpful in combination with `by()`
+
+```
+scatterfit pinc_net age, binned xdistribution(.5 .35)
+scatterfit redistr pinc_net, binned by(gender) xdistribution(1 .35)
+```
+<img src="./examples/gr19.png" height="200"><img src="./examples/gr20.png" height="200">
 
 ## Interaction models
 
@@ -139,7 +158,7 @@ The interesting part is that it now becomes possible to plot regression paramete
 ```
 scatterfit redistr pinc_net, binned by(labf) bymethod(interact) regparameters(coef pval sig int)
 ```
-<img src="./examples/gr18.png" height="300">
+<img src="./examples/gr21.png" height="300">
 
 In this example, it becomes evident that those who are part of the labor force have a significantly stronger slope coefficient of income on support for redistribution.
 
@@ -148,9 +167,9 @@ In this example, it becomes evident that those who are part of the labor force h
 While scatterfit comes with a predefined look that differs considerably from the gory Stata standard, the user may prefer a different look. The `plotscheme()` can be used to define an alternative plot scheme. You can use a Stata-native or user-written scheme here. And `colorscheme()` changes the color palette. Either put a pre-defined color palette such as s2color or tableau here, or define your own colors using a list of hex colors (for example, `colorscheme(#E6007E #009FE3 #312783)`). It is advised that you also change the color palette when you change the overall plot scheme.
 
 ```
-scatterfit pinc_net age, binned plotscheme(white_tableau) colorscheme(tableau)
+scatterfit pinc_net age, binned ci plotscheme(white_tableau) colorscheme(tableau)
 ```
-<img src="./examples/gr19.png" height="300">
+<img src="./examples/gr22.png" height="300">
 
 
 # Tutorial for slopefit
@@ -164,9 +183,9 @@ The following examples will acquaint you with the basics, but it will be much mo
 There are several methods to create the bins of z. As with scatterfit, the standard setting is to categorize z into equally sized bins based on quantile cutoff points. 
 
 ```
-slopefit pinc_net gender age, method(quantiles) nquantiles(20)
+slopefit pinc_net gender age, indslopes(quantiles) nquantiles(20)
 ```
-<img src="./examples/gr20.png" height="300">
+<img src="./examples/gr23.png" height="300">
 
 In this example, the fit line shows the results from the continuous interaction model, and the lowest scatter marker shows the effect of x among those within the bottom 5% of the z distribution. 
 
@@ -174,48 +193,48 @@ Similar to scatterfit, the bins can also be created by sorting z into equally sp
 
 
 ```
-slopefit pinc_net gender age, method(unibin) nunibin(20)
+slopefit pinc_net gender age, indslopes(unibin) nunibin(20)
 ```
-<img src="./examples/gr21.png" height="300">
+<img src="./examples/gr24.png" height="300">
 
 Or by treating z as discrete and using every single distinct value.
 
 ```
-slopefit redistr pinc_net rile, method(discrete)
+slopefit redistr pinc_net rile, indslopes(discrete)
 ```
-<img src="./examples/gr22.png" height="300">
+<img src="./examples/gr25.png" height="300">
 
 The last variant to create the bins of z is to use a user-defined binning variable that already exists in the dataset. In the following example, I will use multi-country survey data from the ESS and define the individual countries as the bins via `binvar()`. In effect, the scatter markers show the individual slope coefficients for the each country in the sample. 
 
 ```
 slopefit gincdif hinctnta rilemean, binvar(cntry) mlabel(cntry)
 ```
-<img src="./examples/gr23.png" height="300">
+<img src="./examples/gr26.png" height="300">
 
 The previous example also shows the `mlabel()` option, which replaces the usual scatter markers with labels from a string variable or labeled numerical variable (in this case the country codes).
 
 ## Confidence intervals and fit lines
 
-The `fit()` option governs options how the main fit line, derived from the linear interaction of x and z, is plotted. You may use 'lfit', 'lfitci', 'qfit', and 'qfitci'. We'll use lfitci here to add confidence intervals to the plot.
+The `fit()` option specifies the functional form of the main fit line, which is derived from the interaction of x and z. You may use 'linear' or 'quadratic'. Confidence intervals for the main fit can be added with the `ci` option.
 
 ```
-slopefit redistr pinc_net rile, method(discrete) fit(lfitci)
+slopefit redistr pinc_net rile, indslopes(discrete) ci
 ```
-<img src="./examples/gr24.png" height="300">
+<img src="./examples/gr27.png" height="300">
 
 It is also possible to plot the confidence intervals of the individual slopes with `indslopesci`, in this case at all distinct values of peoples' left-right self-placement.
 
 ```
-slopefit redistr pinc_net rile, method(discrete) fit(lfitci) indslopesci
+slopefit redistr pinc_net rile, indslopes(discrete) ci indslopesci
 ```
-<img src="./examples/gr25.png" height="300">
+<img src="./examples/gr28.png" height="300">
 
 ## Control variables
 
 Just as with scatterfit, it is simple to add control variables to the underlying regressions to get the partial relationship between x and y at different values of z. Use the `controls()` option to add continuous controls and `fcontrols()` for categorical controls.
 
 ```
-slopefit redistr pinc_net rile, method(discrete) controls(age) fcontrols(gender educ emp)
+slopefit redistr pinc_net rile, indslopes(discrete) controls(age) fcontrols(gender educ emp)
 ```
 
 ## Regression parameters
@@ -223,8 +242,8 @@ slopefit redistr pinc_net rile, method(discrete) controls(age) fcontrols(gender 
 The `regparameters()` option includes parameters from the interaction regression that uses a linear interaction term between x and z (i.e., the regression that results in the overall fit line). 'coef' shows the extent to which the effect of x changes linearly as z increases by one unit, 'pval' the associated p-value, 'sig' prints significance stars onto the interaction coefficient (*<.1, **<.05, ***<.01), and 'nobs' shows the number of observations. 
 
 ```
-slopefit redistr pinc_net rile, method(discrete) regp(coef sig pval nobs)
+slopefit redistr pinc_net rile, indslopes(discrete) regp(coef sig pval nobs)
 ```
-<img src="./examples/gr26.png" height="300">
+<img src="./examples/gr29.png" height="300">
 
 In this case, the results show that the effect of income increases significantly as people become more right-leaning.
