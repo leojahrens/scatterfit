@@ -141,7 +141,7 @@ The program tries to find a good position for the parameters, but this is not al
 
 ## Distribution of the independent variable
 
-The option `xdistribution()` includes a kernel density plot that shows the distribution of the x-variable in the plot. Setting it to `xdistribution(auto)` will have scatterfit automatically look for an appropiate position and height of the density. While this is great for quick plotting, using `xdistribution(a b)` allows the use to input their own baseline position and height, where a is the position and b the height. The option is especially helpful in combination with `by()`
+The option `xdistribution()` includes a kernel density plot that shows the distribution of the x-variable in the plot. Setting it to `xdistribution(auto)` will have scatterfit automatically look for an appropiate position and height of the density. While this is great for quick plotting, using `xdistribution(a b)` allows the use to input their own baseline position and height, where a is the position and b the height. The option is especially helpful in combination with `by()`. The bandwidth of the kernel density can be set with `xdistrbw()`.
 
 ```
 scatterfit pinc_net age, binned xdistribution(.5 .35)
