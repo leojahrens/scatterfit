@@ -207,7 +207,7 @@ slopefit redistr pinc_net rile, indslopes(discrete)
 The last variant to create the bins of z is to use a user-defined binning variable that already exists in the dataset. In the following example, I will use multi-country survey data from the ESS and define the individual countries as the bins via `binvar()`. In effect, the scatter markers show the individual slope coefficients for the each country in the sample. 
 
 ```
-slopefit gincdif hinctnta rilemean, binvar(cntry) mlabel(cntry)
+slopefit gincdif hinctnta rilemean, binvar(cntry) mlabel(cntry) ci
 ```
 <img src="./examples/gr26.png" height="300">
 
