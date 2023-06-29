@@ -17,22 +17,26 @@ yvar xvar zvar {ifin}
 {synopthdr}
 {synoptline}
 
-{syntab:Overall slopes}
-{synopt :{opt fit(str)}}Specifies the fit line that plots the overall interaction model results. May be {it:lfit} for a linear fit, {it:lfitci} to include CIs, or {it:qfit} / {it:qfitci} for a quadratic fit.{p_end}
+{syntab:Overall slope}
+{synopt :{opt fit(str)}}Specifies the functional form of the fit line that plots the overall interaction model results. May be {it:linear} or {it:quadratic} for a second polynomial.{p_end}
 
 {syntab:Individual slopes}
-{synopt :{opt m:ethod(str)}}Determines for what values of {it:zvar} individual slopes of {it:xvar} are plotted. May be {it:quantiles} to divide {it:z} into quantiles, {it:unibin} for uniformly spaced bins, or {it:discrete}.{p_end}
+{synopt :{opt inds:lopes(str)}}Determines for what values of {it:zvar} individual slopes of {it:xvar} are plotted. May be {it:quantiles} to divide {it:z} into quantiles, {it:unibin} for uniformly spaced bins, or {it:discrete}.{p_end}
 {synopt :{opt binv:ar(varlist)}}Plots the effects of {it:xvar} for each within each distinct value of {it:varlist}. Used when the bins are already defined in the dataset.{p_end}
 {synopt :{opt indslopesm:ethod(str)}}Determines how the individual slopes are computed. May be {it:interact} for a unified regression models including interactions or {it:stratify} for separate regressions.{p_end}
+
+{syntab:Confidence intervals and standard errors}
+{synopt :{opt ci}}Includes 95% confidence intervals on the overall fitted slope.{p_end}
 {synopt :{opt indslopesci}}Includes 95% confidence intervals for the individual slopes.{p_end}
+{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of the respective regression model.{p_end}
+{synopt :{opt l:evel(num)}}Changes the confidence level of the CIs.{p_end}
+
+{syntab:Regression model}
+{synopt :{opt fitm:odel(model)}}Changes the regression model used to estimate the individual and overall slopes. See the table below the options for a full list of supported models.{p_end}
 
 {syntab:Conditioning on covariates}
 {synopt :{opt c:ontrols(varlist)}}Adjusts the relationship between {it:xvar} and {it:yvar} linearly for continuous covariates. Achieved by residualization.{p_end}
 {synopt :{opt fc:ontrols(varlist)}}Controls for factor variables, i.e. categorical variables such as gender or region.{p_end}
-
-{syntab:Uncertainty estimates}
-{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of {opt reghdfe} (continuous {it:y}) or {opt logit} (binary {it:y}).{p_end}
-{synopt :{opt l:evel(num)}}Specifies the confidence level for the CIs. Standard is 95.{p_end}
 
 {syntab:Regression parameters}
 {synopt :{opt regp:arameters(str)}}Prints parameters into the plot. May contain {it:coef} for information on how the slope of {it:xvar} changes when {it:zvar} increases by one unit, {it:pval} for the associated p-value, {it:sig} for significance (*<.1, **<.05, ***<.001), and {it:nobs} for N.{p_end}
@@ -63,8 +67,23 @@ yvar xvar zvar {ifin}
 {synopt :{opt stand:ardize}}Standardizes {it:xvar} and {it:yvar} to a standard deviation of one and a mean of zero.{p_end}
 {synopt :{opt legin:side}}Places the legend inside the plot region.{p_end}
 {synopt :{opt opts(str)}}Passes on options to the twoway plot. For example, {opt opts(xtitle("Example"))} changes the x axis title. See {opt help twoway}.{p_end}
-{synopt :{opt binarym:odel(str)}}Specifies the regression model used for binary dependent variables. Must be {it:logit} or {it:probit}.{p_end}
 {synopt :{opt noy:line}}Removes the line at y=0.{p_end}
+
+
+{marker rmodel}{...}
+{title:Supported regression models}
+
+{synopt:{it:model}}Description{p_end}
+{synoptline}
+{synopt:{it:ols}}Linear regression estimated via ordinary least squares. The standard for continuous DVs.{p_end}
+{synopt:{it:poisson}}Poisson regression for count data{p_end}
+{synopt:{it:quantile}}Quantile regression. Standard setting is a regression at the 50th percentile. For other quantiles, specify {opt fitmodel(quantile, p(x))}, where {it:x} is the respective quantile between 1 and 99.{p_end}
+{synopt:{it:randomint}}Multilevel model with random intercepts. The higher-level cluster(s) must be specified with the following syntax: {opt fitmodel(randomint, cluster(x))}, where  {it:x} is the list of cluster variables.{p_end}
+{synopt:{it:randomint, reml}}Estimates the model with REML and DF adjustion for unbiased estimation of SEs with few clusters (see Elff et al. in BJPS). Use the following syntax: {opt fitmodel(randomint, reml cluster(x))}{p_end}
+{synopt:{it:flogit} / {it:fprobit}}Fractional logit/probit model for 0-1 DVs{p_end}
+{synopt:{it:logit} / {it:probit}}Logistical regression with the logit or probit link function. {it:logit} it the standard for binary DVs.{p_end}
+{synopt:{it:lpm}}Linear probability model for binary DVs, estimated with OLS{p_end}
+{synoptline}
 
 
 {title:Examples}
@@ -73,8 +92,8 @@ A detailed tutorial with examples is available at https://github.com/leojahrens/
 
 {phang2}{cmd:. sysuse auto}{p_end}
 {phang2}{cmd:. slopefit weight length turn}{p_end}
-{phang2}{cmd:. slopefit weight length turn, fit(lfitci)}{p_end}
-{phang2}{cmd:. slopefit weight length turn, fit(lfitci) method(discrete)}{p_end}
+{phang2}{cmd:. slopefit weight length turn, ci}{p_end}
+{phang2}{cmd:. slopefit weight length turn, ci method(discrete)}{p_end}
 
 
 

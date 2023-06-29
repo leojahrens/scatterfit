@@ -1,4 +1,4 @@
-*! version 1.7.1   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -11,11 +11,10 @@ version 15
 
 syntax varlist(min=2 max=2)	[if] [in] [aweight fweight] , [
 
-fit(string) BWidth(numlist max=1)  
+fit(string) ci FITModel(string asis) BWidth(numlist max=1)  
 by(string) BYMethod(string)
-BINned DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
-Controls(varlist) Fcontrols(varlist)     
-BINARYModel(string)
+BINned BINMethod(string) DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
+Controls(varlist numeric fv) Fcontrols(varlist)     
 REGParameters(string) PARPos(string) PARSize(string)
 XDISTRibution(string asis) xdistrbw(numlist max=1)
 vce(string) Level(numlist max=1)
@@ -27,10 +26,12 @@ scale(string) XYSize(string)
 PLOTScheme(string asis) COLorscheme(string asis) CINTensity(numlist max=1)
 opts(string asis)
 
-/* legacy */
+/* legacy and dev */
+BINARYModel(string)
 polybw(numlist max=1) 
 COVariates(varlist) ABSorb(varlist)
 coef COEFPos(string) COEFPLace(string)
+loud
 ] ;
 
 #delimit cr
@@ -41,7 +42,7 @@ coef COEFPos(string) COEFPLace(string)
 
 local gtoolsu = 0
 local paletteu = 0
-foreach package in reghdfe gtools ftools {
+foreach package in reghdfe gtools ftools labmask {
 	capture which `package'
 	if _rc==111 & "`package'"=="gtools" local gtoolsu = 1 
 	if _rc==111 ssc install `package', replace
@@ -53,8 +54,10 @@ if `paletteu'==1 ssc install colrspace, replace
 if `paletteu'==1 ssc install palettes, replace
 capture set scheme plotplain
 if _rc==111 ssc install blindschemes, replace
-capture which labmask
-if _rc==111 ssc install labutil, replace
+if inlist("`fitmodel'","quantile","mmreg") {
+	capture which robreg
+	if _rc==111 ssc install robreg, replace
+}
 
 
 *-------------------------------------------------------------------------------
@@ -83,8 +86,13 @@ if "`polybw'"!=""  di as error "You specified the legacy option {bf:polybw()}, w
 if "`absorb'"!="" di as error "You specified the legacy option {bf:absorb()}, which is now {bf:fcontrols()}. The setting {bf:fcontrols(`absorb')} is assumed"
 if "`covariates'"!="" di as error "You specified the legacy option {bf:covariates()}, which is now {bf:controls()}. The setting {bf:controls(`covariates')} is assumed"
 if "`coef'"!="" di as error "You specified the legacy option {bf:coef}, which is now governed by {bf:regparameters()}. The setting {bf:regparameters(coef pval)} is assumed."
-if "`coefpos'"!="" | "`coefplace'"!=""  di as error "You specified the legacy option {bf:coefpos()} or {bf:coefplace()}, which is now {bf:parpos()}. The setting {bf:parpos(`coefplace'`coefpos')} is assumed"
-if strpos("`regparameters'","beta")  di as error "You specified the legacy option {bf:regparameters(beta)}, which is now {bf:regparameters(coef)}. The setting {bf:regparameters(coef)} is assumed."
+if "`coefpos'"!="" | "`coefplace'"!="" di as error "You specified the legacy option {bf:coefpos()} or {bf:coefplace()}, which is now {bf:parpos()}. The setting {bf:parpos(`coefplace'`coefpos')} is assumed"
+if strpos("`regparameters'","beta") di as error "You specified the legacy option {bf:regparameters(beta)}, which is now {bf:regparameters(coef)}. The setting {bf:regparameters(coef)} is assumed."
+if strpos("`fit'","ci") di as error "You specified the inclusion of confidence intervals via including 'ci' in the fit() option. In the new version of scatterfit, you do this by including the {it:ci} option [outside of fit()], which is assumed."
+if strpos("`fit'","lfit") di as error "You specified a linear fit via fit(lfit), which is legacy code. It is assumed that you used the new syntax: {it:fit(linear)}."
+if strpos("`fit'","qfit") di as error "You specified a quadratic fit via fit(qfit), which is legacy code. It is assumed that you used the new syntax: {it:fit(quadratic)}."
+if "`fit'"=="poly" | "`fit'"=="polyci" di as error "You specified a polynomial via fit(poly), which is legacy code. It is assumed that you used the new syntax: {it:fit(lpoly)}."
+if inlist("`binarymodel'","logit","probit") di as error "You specified a logit/probit model via binarymodel(logit/probit), which is legacy code. It is assumed that you used the new syntax: {it:fitmodel(logit/probit)}."
 
 // harmonize legacy options
 if "`polybw'"!="" & "`bwidth'"=="" local bwidth `polybw'
@@ -94,6 +102,12 @@ if "`coef'"!="" & "`regparameters'"=="" local regparameters coef pval
 if "`coefplace'"!="" & "`parpos'"=="" local parpos `coefplace'
 if "`coefpos'"!="" & "`parpos'"=="" local parpos `coefpos'
 if strpos("`regparameters'","beta") local regparameters `regparameters' coef
+if strpos("`fit'","ci") local ci ci
+if strpos("`fit'","lfit") local fit linear
+if strpos("`fit'","qfit") local fit quadratic
+if "`fit'"=="poly" | "`fit'"=="polyci" local fit lpoly
+if "`binarymodel'"=="logit" local fitmodel logit
+if "`binarymodel'"=="probit" local fitmodel probit
 
 // x and y variables
 foreach mm in x y {
@@ -107,14 +121,19 @@ if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit")
 	di as error "{bf:binarymodel()} must contain logit or probit."
 	exit 498
 }
-gduplicates report `y' `if'
+if "`if'"!="" {
+    gduplicates report `y' `if' & !mi(`y'), fast
+}
+else {
+    gduplicates report `y' `if' if !mi(`y'), fast
+}
 local yvalcount = r(unique_value)
 if `yvalcount'==2 {
 	if "`controls'`fcontrols'"!="" {
-		di as error "The use of covariates with a binary dependent variable is not supported."
-		exit 498
+		di as error "You are using a binary dependent variable with control variables. The scatter points may be unsuited."
+		*exit 498
 	}
-	if "`fit'"=="lowess" | strpos("`fit'","poly") {
+	if "`fit'"=="lowess" | "`fit'"=="lpoly" {
 		di as error "Local polynomial and lowess fits are not supported for binary dependent variables."
 		exit 498
 	}
@@ -122,8 +141,8 @@ if `yvalcount'==2 {
 		di as error "It is advised to use the binned option with binary dependent variables."
 	}
 }
-if "`binarymodel'"!="" & `yvalcount'!=2 {
-	di as error "Logit/probit models require a binary dependent variable."
+if ("`fitmodel'"=="probit" | "`fitmodel'"=="logit" | "`fitmodel'"=="lpm") & `yvalcount'!=2 {
+	di as error "Logit/probit/LPM models require a binary dependent variable."
 	exit 498
 }
 
@@ -140,13 +159,42 @@ if "`bymethod'"!="" {
 }
 
 // fit specification and option combinations correct?
-if !("`fit'"=="" | "`fit'"=="lfit" | "`fit'"=="lfitci" | "`fit'"=="qfit" | "`fit'"=="qfitci" | "`fit'"=="poly" | "`fit'"=="polyci" | "`fit'"=="lowess") {
-	di as error "fit() must be lfit, lfitci, qfit, qfitci, poly, or polyci."
+if !("`fit'"=="" | "`fit'"=="linear" | "`fit'"=="quadratic" | "`fit'"=="cubic" | "`fit'"=="lpoly" | "`fit'"=="lowess") {
+	di as error "fit() must be set to {it:linear}, {it:quadratic}, {it:cubic}, {it:lpoly}, or {it:lowess}."
 	exit 498
 }
-if "`bwidth'"!="" & !(strpos("`fit'","poly") | "`fit'"=="lowess") {
+if "`bwidth'"!="" & !("`fit'"=="lowess" | "`fit'"=="lpoly") {
 	di as error "The bwidth() option requires a local polynomial fit or a lowess smother as the fit line."
 	exit 498
+}
+
+// fit model correct?
+if "`fitmodel'"!="" & !inlist("`fitmodel'","ols","poisson","logit","probit","flogit","fprobit","lpm") & !(strpos("`fitmodel'","randomint") | strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg")) {
+	di as error "fitmodel() must be set to {it:ols}, {it:poisson}, {it:quantile}, {it:randomint}, {it:flogit}, {it:fprobit}, {it:logit}, {it:probit}, or {it:lpm}."
+	exit 498
+}
+if strpos("`fitmodel'","randomint") {
+	local strtest = subinstr("`fitmodel'", "randomint", "",.)
+	if "`strtest'"=="" {
+		di as error "You need to specify the higher level cluster of the multilevel model using fitmodel(randomint, cluster(varname))."
+		exit 498
+	}
+	else {
+		local rintcluster = subinstr(subinstr(subinstr(subinstr("`fitmodel'", "reml", "",.), ")", "",.),",","",.),"(","",.)
+		local rintcluster = subinstr(subinstr("`rintcluster'","cluster","",.),"randomint", "",.)
+		cap qui sum `rintcluster'
+		if _rc di as error "Something went wrong. Please use this syntax for specifying a random intercepts model:  fitmodel(randomint, cluster(varname)) - optionally you can also include {it:reml} in the brackets."
+		if _rc exit 498
+	}
+}
+if strpos("`fitmodel'","quantile") {
+	local qregquant = subinstr(subinstr(subinstr("`fitmodel'", ")", "",.), "(", "",.), ",", "",.)
+	local qregquant = subinstr(subinstr(subinstr("`qregquant'", "p", "",.), "quantile", "",.)," ","",.)
+	cap dis `qregquant'*1
+	if _rc & "`qregquant'"!="" {
+		di as error "Something went wrong. Please use this syntax for specifying a quantile regression model: {it:fitmodel(quantile, p(x))}, where x is a quantile between 0 and 100."
+		exit 498
+	}
 }
 
 // binned options
@@ -158,20 +206,30 @@ if "`unibin'"!="" & ("`discrete'"!="" | "`binvar'"!="" | "`nquantiles'"!="") {
 	di as error "The unibin() option cannot be combined with discrete, nquantiles(), or binvar()."
 	exit 498
 }
+if "`binmethod'"!="" & !inlist("`binmethod'","mean","median") {
+	di as error "The binmethod() option must be set to {it:mean} or {it:median}."
+	exit 498
+}
+
+// control variables
+if strpos("`controls'","i.") {
+	di as error "It seems like you used factor variable notation in the specification of controls, such as {it:controls(i.education)}. Please enter all categorical control variables & fixed effects variables into the fcontrols() option without factor variable notation, such as {it:fcontrols(education)}."
+	exit 498
+}
 
 // CIs and standard errors
 if "`controls'`fcontrols'"!="" {
-	if strpos("`fit'","poly") | "`fit'"=="lowess" {
-		di as error "Polynomial and lowess fits cannot be plotted when control variables are specified."
+	if "`fit'"=="lpoly" | "`fit'"=="lowess" {
+		di as error "Local polynomial and lowess fits cannot be plotted when control variables are specified."
 		exit 498
 	}
 }
 if "`vce'"!="" {
-	if !strpos("`fit'","ci") & "`regparameters'"=="" {
-		di as error "The vce() option requires that confidence intervals are drawn by fit(lfitci) / fit(qfitci) or that regression parameters are plotted via the regparameters() option."
+	if "`ci'"=="" & "`regparameters'"=="" {
+		di as error "The vce() option requires that confidence intervals are drawn via the {it:ci} option or that regression parameters are plotted via the {it:regparameters()} option."
 		exit 498
 	}
-	if strpos("`fit'","poly") |  "`fit'"=="lowess" {
+	if "`fit'"=="lpoly" |  "`fit'"=="lowess" {
 		dis as error "The vce() option is incompatible with a polynomial or lowess fit."
 		exit 498
 	}
@@ -179,7 +237,7 @@ if "`vce'"!="" {
 
 // coefficient print
 if "`regparameters'"!="" {
-	if strpos("`fit'","qfit") | strpos("`fit'","poly") |  "`fit'"=="lowess" {
+	if !("`fit'"=="" | "`fit'"=="linear") {
 		dis as error "Regression parameters can only be plotted for a linear fit."
 		exit 498
 	}
@@ -234,10 +292,9 @@ if "`by'"!="" local bydrop | mi(`by')
 drop if mi(`x') | mi(`y') `covdrop' `bydrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
-if strpos("`vce'","cluster") {
-	local clustervar: subinstr local vce "cluster" "", all
-}
-keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
+if strpos("`vce'","cluster") local clustervar: subinstr local vce "cluster" "", all
+if strpos("`fitmodel'","cluster") local clustervar2 `rintcluster'
+keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar' `clustervar2'
 
 
 *-------------------------------------------------------------------------------
@@ -264,7 +321,7 @@ if `isthereby'==0 {
 capture confirm numeric variable `by'
 if _rc {
 	rename `by' oldby
-	egen `by' = group(oldby)
+	gegen `by' = group(oldby)
 	labmask `by', values(oldby)
 }
 
@@ -301,14 +358,14 @@ if `isthereby'==1 {
 }
 
 // check if dependent variable is binary & transform into a dummy if required
-local binarydv = 0
-if "`yval'"=="0 1" local binarydv = 1
+if `yvalcount'==2 local binarydv = 1
+if `yvalcount'!=2 local binarydv = 0
+if `binarydv'==1 glevelsof `y', local(yval)
 capture confirm numeric variable `y'
-if `yvalcount'==2 & ("`yval'"!="0 1" | _rc) {
-	local binarydv = 1
+if `binarydv'==1 & ("`yval'"!="0 1" | _rc) {
 	local ylab: variable label `y'
 	rename `y' old`y'
-	egen `y' = group(old`y')
+	gegen `y' = group(old`y')
 	replace `y' = `y'-1
 	lab var `y' "`ylab'"
 }
@@ -395,7 +452,7 @@ if "`binned'"=="" & "`mweighted'"!="" {
 }
 
 if "`binned'"!="" | "`mweighted'"!="" {
-	egen xbin = group(`x'_q `by')
+	gegen xbin = group(`x'_q `by')
 }
 
 
@@ -403,7 +460,8 @@ if "`binned'"!="" | "`mweighted'"!="" {
 * specify if own predictions & CIs should be used in final plot, and which
 *-------------------------------------------------------------------------------
 
-if ((`isthereby'==1 & "`bymethod'"=="interact") | "`controls'`fcontrols'"!="" | "`vce'"!="" | `binarydv'==1) & !strpos("`fit'","poly") & "`fit'"!="lowess" {
+if ((`isthereby'==1 & "`bymethod'"=="interact") | "`controls'`fcontrols'"!="" | "`vce'"!="" | `binarydv'==1 | "`fit'"=="cubic" | !("`fitmodel'"=="ols" | "`fitmodel'"=="")) ///
+	& "`fit'"!="lpoly" & "`fit'"!="lowess" {
 	local ownpred_plot = 1
 }
 else {
@@ -411,7 +469,7 @@ else {
 }
 
 // confidence level
-if strpos("`fit'","ci") {
+if "`ci'"!="" {
 	if "`level'"=="" local level 95
 	local cilvl level(`level')
 	local cilvltext `level'%
@@ -423,26 +481,77 @@ if strpos("`fit'","ci") {
 
 if `ownpred_plot'==1 | "`regparameters'"!="" {
 
-// prepare specification
-	local `x'marg c.`x'
-	if strpos("`fit'","qfit") local `x'marg ``x'marg'##c.`x'
+	// prepare specification
+	if "`fit'"=="linear" | "`fit'"=="" local `x'marg c.`x'
+	if "`fit'"=="quadratic" local `x'marg c.`x'##c.`x'
+	if "`fit'"=="cubic" local `x'marg c.`x'##c.`x'##c.`x'
 	if "`bymethod'"=="interact" local `x'marg ``x'marg'##i.`by'
-	local hdfeabsorb noabsorb
+	
+	// choose correct regression model
+	if "`fitmodel'"=="" {
+	    if `binarydv'==0 local model reghdfe 
+		if `binarydv'==1 local model logit 
+	}
+	else {
+	    if "`fitmodel'"=="ols" | "`fitmodel'"=="lpm" local model reghdfe
+		if "`fitmodel'"=="flogit" local model fracreg logit
+		if "`fitmodel'"=="fprobit" local model fracreg probit
+		if "`fitmodel'"=="mmreg" local model robreg mm
+		if "`fitmodel'"=="poisson" local model poisson
+		if "`fitmodel'"=="logit" local model logit
+		if "`fitmodel'"=="probit" local model probit
+		if strpos("`fitmodel'","quantile") local model robreg q
+		if strpos("`fitmodel'","randomint") & `binarydv'==0 local model mixed
+		if strpos("`fitmodel'","randomint") & `binarydv'==1 local model melogit
+	}
+	
+	// full regression variable specification
+	if "`model'"=="reghdfe" {
+	    local regvars ``x'marg' `controls'
+	}
+	else {
+	    foreach var in `fcontrols' {
+		    local fchelp `fchelp' i.`var'
+		}
+		local regvars ``x'marg' `controls' `fchelp'
+	}
+	
+	// regression options
+	if "`fcontrols'"=="" local hdfeabsorb noabsorb
 	if "`fcontrols'"!="" local hdfeabsorb absorb(`fcontrols')
 	if "`vce'"!="" local vce vce(`vce')
-	if "`binarymodel'"=="" local binarymodel logit
+	local regmodelopts `vce'
 	
+	if "`model'"=="reghdfe" {
+	    local regmodelopts `regmodelopts' `hdfeabsorb'
+	}
+	
+	else if "`model'"=="mixed" {
+		if strpos("`fitmodel'","reml") local regmodelopts `regmodelopts' reml dfmethod(satterthwaite)
+		foreach cl in `rintcluster' {
+		    local regvars `regvars' || `cl':
+		}
+	}
+	
+	else if "`model'"=="robreg q" {
+	    if "`qregquant'"=="" {
+			local quantile 0.5
+		}
+		else {
+		    local quantile = `qregquant'
+		}
+	    local regmodelopts `regmodelopts' q(`quantile')
+	}
+
 	// estimate
 	if "`bymethod'"=="stratify" {
 		foreach bynum2 in `bynum' {
-			if `binarydv'==0 reghdfe `y' ``x'marg' `controls' if `by'==`bynum2' `w', `hdfeabsorb' `vce' 
-			if `binarydv'==1 `binarymodel' `y' ``x'marg' if `by'==`bynum2' `w', `vce' 
+		    `model' `y' `regvars' if `by'==`bynum2' `w', `regmodelopts'
 			est sto regmodel`bynum2'
 		}
 	}
 	else {
-		if `binarydv'==0 reghdfe `y' ``x'marg' `controls' `w', `hdfeabsorb' `vce' 
-		if `binarydv'==1 `binarymodel' `y' ``x'marg' `w', `vce' 
+		`model' `y' `regvars' `w', `regmodelopts'
 		est sto regmodel
 	}
 }
@@ -461,11 +570,11 @@ if "`regparameters'"!="" {
 		* r2, nobs
 		est res regmodel`bynumname'
 		local nobs`bynumname' = e(N)
-		if `binarydv'==0 {
+		if `binarydv'==0 | "`fitmodel'"=="lpm" {
 			local r2`bynumname' = e(r2)
 			local adjr2`bynumname' = e(r2_a)
 		}
-		if `binarydv'==1 {
+		if (`binarydv'==1 & "`fitmodel'"!="lpm") | inlist("`model'","poisson","robreg q","robreg mm","fracreg logit","fracreg probit") {
 			local r2`bynumname' = e(r2_p)
 			local adjr2`bynumname' = e(r2_p)
 		}
@@ -504,6 +613,7 @@ if "`regparameters'"!="" {
 					if !strpos("`intmargchecker'","`bynum3'`bynum2'") {
 						local intmargchecker "`intmargchecker' `bynum2'`bynum3'"
 						local coef`bynum2'_`bynum3' = _b[`count'._at]-_b[`count2'._at]
+						dis `" test _b[`count'._at] = _b[`count2'._at]  "'
 						test _b[`count'._at] = _b[`count2'._at]
 						local pval`bynum2'_`bynum3' = r(p)
 						local parbyintcompiler `parbyintcompiler' coef`bynum2'_`bynum3' pval`bynum2'_`bynum3'
@@ -592,18 +702,23 @@ if "`regparameters'"!="" {
 if `ownpred_plot'==1 {
 	
 	// get x var
-	if `binarydv'==1 | "`binned'"!="" gen `x'2 = `x'
-	if `binarydv'==0 & "`binned'"=="" {
+	if "`controls'`fcontrols'"!="" & "`binned'"==""  {
 		reghdfe `x' `controls' `w', `hdfeabsorb' res(`x'2)
 		sum `x' `w'
 		replace `x'2 = `x'2 + r(mean)
 	}
-	
+	else {
+		gen `x'2 = `x'
+	}
+
 	// options for linear prediction estimation
-	if `binarydv'==0 local atmean atmeans
-	if !strpos("`fit'","qfit") 	local margpoints 30
-	if strpos("`fit'","qfit") 	local margpoints 50
-	
+	if `binarydv'==0 | "`fitmodel'"=="lpm" local atmean atmeans
+	if "`fit'"=="linear" | "`fit'"=="" {
+	    local margpoints 30
+	}
+	else {
+	    local margpoints 50
+	}
 	foreach bynum2 in `bynum' {
 		
 		// gen empty variables for storage
@@ -684,10 +799,11 @@ if "`controls'`fcontrols'"!="" {
 *-------------------------------------------------------------------------------
 
 if "`binned'"!="" {
-	gegen `y'_mean = mean(`y') `w', by(xbin)
-	gegen `x'_mean = mean(`x') `w', by(xbin)
+	if "`binmethod'"=="" local binmethod mean
+	gegen `y'_mean = `binmethod'(`y') `w', by(xbin)
+	gegen `x'_mean = `binmethod'(`x') `w', by(xbin)
 	if "`mweighted'"!="" gegen scw = count(`y'), by(xbin)
-	egen tag = tag(xbin) if !mi(`y'_mean)
+	gegen tag = tag(xbin) if !mi(`y'_mean)
 	replace `y'_mean = . if tag!=1
 }
 
@@ -708,6 +824,19 @@ else {
 count if !mi(`xplot') & !mi(`yplot') & !mi(`by')
 local n = r(N)
 
+
+*-------------------------------------------------------------------------------
+* restrict values for binary dependent variables
+*-------------------------------------------------------------------------------
+
+if `binarydv'==1 & "`fcontrols'`controls'"!="" & "`binned'"!="" & "`fitmodel'"!="lpm" {
+    sum `yplot'
+	if r(max)>1 {
+	    di as error "Some binned residualized values of the dependent variable are larger than 1 or smaller than 0. They are limited to the 0-1 range in the plot."
+		replace `yplot' = 1 if `yplot'>1 & !mi(`yplot')
+		replace `yplot' = 0 if `yplot'<0 & !mi(`yplot')
+	}
+}
 
 *-------------------------------------------------------------------------------
 * color palette
@@ -746,7 +875,7 @@ if "`plotscheme'"=="" {
 	
 	foreach i of numlist 1/8 {
 		local mlines`i' lc(`c`i'') lw(medthick)
-		local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
+		local mlinesci`i' fc(`c`i'o30') fi(*2.4) alw(none) clc(`c`i'') clw(medthick)
 		local ciareas`i' lw(none) fc(`c`i'o30')
 		local xdistareas`i' lw(none) fc(`c`i'o50')
 		local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlabc(`c`i'') mlw(thin)
@@ -881,26 +1010,20 @@ if "`mlabel'"!="" {
 *-------------------------------------------------------------------------------
 
 if `ownpred_plot'==0 {
-	if "`fit'"=="lfit" | "`fit'"=="" local fittype lfit
-	if "`fit'"=="lfitci" local fittype lfitci
-	if "`fit'"=="qfitci" local fittype qfitci
-	if "`fit'"=="qfit" local fittype qfit
-	if "`fit'"=="polyci" local fittype lpolyci
-	if "`fit'"=="poly" local fittype lpoly
+	if ("`fit'"=="linear" | "`fit'"=="" ) & "`ci'"=="" local fittype lfit
+	if ("`fit'"=="linear" | "`fit'"=="") & "`ci'"!="" local fittype lfitci
+	if "`fit'"=="quadratic" & "`ci'"!="" local fittype qfitci
+	if "`fit'"=="quadratic" & "`ci'"=="" local fittype qfit
+	if "`fit'"=="lpoly" & "`ci'"!="" local fittype lpolyci
+	if "`fit'"=="lpoly" & "`ci'"=="" local fittype lpoly
 	if "`fit'"=="lowess" local fittype lowess
 }
 
-if "`fit'"=="" | !strpos("`fit'","ci") {
-	foreach ff of numlist 1/9 {
-		local o`ff' `mlines`ff''
-	}
+if "`ci'"!="" & `ownpred_plot'==0 local ciput ci
+foreach ff of numlist 1/9 {
+	local o`ff' `mlines`ciput'`ff''
 }
-else {
-	foreach ff of numlist 1/9 {
-		local o`ff' `mlinesci`ff''
-	}
-}
-	
+
 
 *-------------------------------------------------------------------------------
 * put regression parameters in plot
@@ -910,7 +1033,7 @@ local wherecoef = 0
 if "`regparameters'"!="" {
 	
 	// figure out where to position the box
-	sum `yplot',d
+	gstats sum `yplot'
 	local ymax = r(max)
 	local ymin = r(min)
 	local y25 = r(p25)
@@ -919,7 +1042,7 @@ if "`regparameters'"!="" {
 	local y75larger = r(N)
 	count if `yplot'<`y25'
 	local y25smaller = r(N)
-	sum `xplot',d
+	gstats sum `xplot'
 	local xmax = r(max)
 	local xmin = r(min)
 	local xmean = r(mean)
@@ -992,13 +1115,13 @@ if "`regparameters'"!="" {
 		
 		* r2
 		if strpos("`regparameters'","r2") & !strpos("`regparameters'","adjr2") {
-			if `binarydv'==0 local r2par `r2par' {it:R2`parbylabn`bynum2''}`r2`bynumname''
-			if `binarydv'==1 local r2par `r2par' {it:Pseudo R2`parbylabn`bynum2''}`r2`bynumname''
+			if (`binarydv'==0 | "`fitmodel'"=="lpm") & !inlist("`model'","poisson","robreg q","robreg mm","fracreg logit","fracreg probit") local r2par `r2par' {it:R2`parbylabn`bynum2''}`r2`bynumname''
+			if (`binarydv'==1 & "`fitmodel'"!="lpm") | inlist("`model'","poisson","robreg q","robreg mm","fracreg logit","fracreg probit") local r2par `r2par' {it:Pseudo R2`parbylabn`bynum2''}`r2`bynumname''
 		}
 		* adj r2
 		if strpos("`regparameters'","adjr2") {
-			if `binarydv'==0 local adjr2par `adjr2par' {it:Adj. R2`parbylabn`bynum2''}`adjr2`bynumname''
-			if `binarydv'==1 local adjr2par `adjr2par' {it:Pseudo R2`parbylabn`bynum2''}`r2`bynumname''
+			if (`binarydv'==0 | "`fitmodel'"=="lpm") & !inlist("`model'","poisson","robreg q","robreg mm","fracreg logit","fracreg probit") local adjr2par `adjr2par' {it:Adj. R2`parbylabn`bynum2''}`adjr2`bynumname''
+			if (`binarydv'==1 & "`fitmodel'"!="lpm") | inlist("`model'","poisson","robreg q","robreg mm","fracreg logit","fracreg probit") local adjr2par `adjr2par' {it:Pseudo R2`parbylabn`bynum2''}`r2`bynumname''
 		}
 		* observations 
 		if strpos("`regparameters'","nobs") local nobspar `nobspar' {it:N`parbylabn`bynum2''}`nobs`bynumname''
@@ -1019,8 +1142,8 @@ if "`regparameters'"!="" {
 				local sepvalpar`bynum2' " (`separ`bynum2''`leerz'`pvalpar`bynum2'')"
 			}
 			
-			if `binarydv'==0 local whatcoef {it:{&beta}`parbylab`bynum2''}
-			if `binarydv'==1 local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}
+			if `binarydv'==0 | "`fitmodel'"=="lpm" local whatcoef {it:{&beta}`parbylab`bynum2''}
+			if `binarydv'==1 & "`fitmodel'"!="lpm" local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}
 			local coefpar`bynum2' `whatcoef'`coef`bynum2''`sigstar`bynum2''
 			local jcoefpar`bynum2' `coefpar`bynum2''`sepvalpar`bynum2''
 			local jcoefparcollect `jcoefparcollect' jcoefpar`bynum2'
@@ -1046,8 +1169,8 @@ if "`regparameters'"!="" {
 								if `siglevel`bynum2'_`bynum3''==.01 local sigstar`bynum2'_`bynum3' ***
 							}
 							if strpos("`regparameters'","pval") local intpvalpar`bynum2'_`bynum3' " ({it:p}`pval`bynum2'_`bynum3'')"
-							if `binarydv'==0 local whatcoef {it:{&beta}`parbylab`bynum2''}-{it:ß`parbylab`bynum3''}
-							if `binarydv'==1 local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}-{it:{&delta}Pr/{&delta}x`parbylab`bynum3''}
+							if `binarydv'==0 | "`fitmodel'"=="lpm" local whatcoef {it:{&beta}`parbylab`bynum2''}-{it:ß`parbylab`bynum3''}
+							if `binarydv'==1 & "`fitmodel'"!="lpm" local whatcoef {it:{&delta}Pr/{&delta}x`parbylab`bynum2''}-{it:{&delta}Pr/{&delta}x`parbylab`bynum3''}
 							
 							local intcoefpar`bynum2'_`bynum3' `whatcoef'`coef`bynum2'_`bynum3''`sigstar`bynum2'_`bynum3''`intpvalpar`bynum2'_`bynum3''
 							local intparcollect `intparcollect' intcoefpar`bynum2'_`bynum3'
@@ -1105,11 +1228,13 @@ local legopts legend(`legtype' `legresize')
 
 // compile labels and legend options
 if "`binned'"=="" local leg_obs Observed
-if "`binned'"!="" local leg_obs Bin means
-if strpos("`fit'","lfit") | "`fit'"=="" local leg_fit Linear
-if strpos("`fit'","qfit") local leg_fit Quadratic
-if strpos("`fit'","poly") local leg_fit Local polynomial
-if strpos("`fit'","lowess") local leg_fit Lowess
+if "`binned'"!="" & "`binmethod'"!="median" local leg_obs Bin means
+if "`binned'"!="" & "`binmethod'"=="median" local leg_obs Bin medians
+if "`fit'"=="linear" | "`fit'"=="" local leg_fit Linear
+if "`fit'"=="quadratic" local leg_fit Quadratic
+if "`fit'"=="cubic" local leg_fit Cubic
+if "`fit'"=="lpoly" local leg_fit Local polynomial
+if "`fit'"=="lowess" local leg_fit Lowess
 
 foreach ii of numlist 1/4 {
     local n`ii' = `ii'
@@ -1121,7 +1246,7 @@ foreach ii of numlist 1/4 {
 
 if `isthereby'==0 {
 	if "`mlabel'"=="" local firstlegel `m1' "`leg_obs'" 
-	if !strpos("`fit'","ci") {
+	if "`ci'"=="" {
 		local legopts `legopts' legend(order(`firstlegel' `n2' "`leg_fit' fit"))
 	}
 	else {
@@ -1130,7 +1255,7 @@ if `isthereby'==0 {
 }
 
 if `isthereby'==1 {
-	egen distinctby = group(`by')
+	gegen distinctby = group(`by')
 	sum distinctby
 	local maxdistinctby = r(max)
 	local coln = 0
@@ -1141,11 +1266,11 @@ if `isthereby'==1 {
 		local coln = `coln'+1
 		local colncopy = `coln'
 		if `ownpred_plot'==0 {
-		    if strpos("`fit'","ci") local ciadd "+`coln'"
+		    if "`ci'"!="" local ciadd "+`coln'"
 			local coln2 = `coln'+`maxdistinctby'`ciadd'
 		}
 		else {
-		    if strpos("`fit'","ci") local ciadd "+`maxdistinctby'"
+		    if "`ci'"!="" local ciadd "+`maxdistinctby'"
 			local coln2 = `coln'+`maxdistinctby'`ciadd'
 		}
 		if "`mweighted'"!="" local coln2 = `coln2'+`maxdistinctby'
@@ -1261,21 +1386,18 @@ foreach bynum2 in `bynum' {
 	
 	* fit line & CIs using off-the-shelf fitting
 	if `ownpred_plot'==0 {
-		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2', `o`coln'' `bwidth' `cilvl')
+		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2' `w', `o`coln'' `bwidth' `cilvl')
 	}
 	
 	* own fit lines and CIs from margins
 	else {
-		if strpos("`fit'","ci") local ci `ci' (rarea cil`bynum2' ciu`bynum2' cix`bynum2', `ciareas`coln'')
+		if "`ci'"!="" local cis `cis' (rarea cil`bynum2' ciu`bynum2' cix`bynum2', `ciareas`coln'')
 		local pl `pl' (line pe`bynum2' cix`bynum2', `o`coln'')
 	}
-	
 }
 
 // draw the final plot
-tw `xdistr' `sce' `sc' `ci' `pl', `lscatteropts'
-
-
+tw `xdistr' `sce' `sc' `cis' `pl', `lscatteropts'
 
 
 *-------------------------------------------------------------------------------
