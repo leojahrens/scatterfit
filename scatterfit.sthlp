@@ -71,6 +71,7 @@ yvar xvar {ifin}
 {syntab:Other}
 {synopt :{opt stand:ardize}}Standardizes {it:xvar} and {it:yvar} to a standard deviation of one and a mean of zero.{p_end}
 {synopt :{opt legin:side}}Places the legend inside the plot region.{p_end}
+{synopt :{opt slow}}Uses (slower) native Stata commands instead of packages such as Gtools.{p_end}
 {synopt :{opt opts(str)}}Passes on options to the twoway plot. For example, {opt opts(xtitle("Example"))} changes the x axis title. See {opt help twoway}.{p_end}
 
 

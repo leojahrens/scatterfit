@@ -1,4 +1,4 @@
-*! version 1.8   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.2   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 15
@@ -26,7 +26,7 @@ NOYline
 MWeighted MSize(string) MLabel(varlist max=1)
 scale(string) XYSize(string)
 PLOTScheme(string asis) COLorscheme(string asis) CINTensity(numlist max=1)
-opts(string asis)
+opts(string asis) slow
 
 /* legacy */
 BINARYModel(string) Method(string)
@@ -40,20 +40,42 @@ coef COEFPos(string) COEFPLace(string)
 * install dependencies
 *-------------------------------------------------------------------------------
 
-local gtoolsu = 0
-local paletteu = 0
-foreach package in reghdfe gtools ftools {
+// install
+foreach package in reghdfe ftools labmask {
 	capture which `package'
-	if _rc==111 & "`package'"=="gtools" local gtoolsu = 1 
 	if _rc==111 ssc install `package', replace
 }
-if `gtoolsu'==1 gtools, upgrade
+capture which gtools
+if _rc==111 & "`slow'"=="" {
+	ssc install gtools, replace 
+	gtools, upgrade
+}
 capture which colorpalette
-if _rc==111 local paletteu = 1
-if `paletteu'==1 ssc install colrspace, replace
-if `paletteu'==1 ssc install palettes, replace
+if _rc==111 {
+	ssc install colrspace, replace
+	ssc install palettes, replace
+}
 capture set scheme plotplain
 if _rc==111 ssc install blindschemes, replace
+if inlist("`fitmodel'","quantile","mmreg") {
+	capture which robreg
+	if _rc==111 ssc install robreg, replace
+}
+
+// prep no gtools option 
+if "`slow'"!="" {
+	local lvlsof levelsof
+	local sumd sum 
+	local sumd2 , d
+	local ggen egen
+	local duplrep duplicates report
+}
+else {
+	local lvlsof glevelsof
+	local sumd gstats sum
+	local ggen gegen
+	local duplrep gduplicates report
+}
 
 
 *-------------------------------------------------------------------------------
@@ -113,10 +135,10 @@ foreach mm in x z y {
 	}
 }
 if "`if'"!="" {
-    gduplicates report `y' `if' & !mi(`y'), fast
+    `duplrep' `y' `if' & !mi(`y')
 }
 else {
-    gduplicates report `y' `if' if !mi(`y'), fast
+    `duplrep' `y' `if' if !mi(`y')
 }
 local yvalcount = r(unique_value)
 if "`binarymodel'"!="" & `yvalcount'!=2 {
@@ -264,26 +286,26 @@ keep `x' `y' `z' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clusterv
 // check if dependent variable is binary & transform into a dummy if required
 if `yvalcount'==2 local binarydv = 1
 if `yvalcount'!=2 local binarydv = 0
-if `binarydv'==1 glevelsof `y', local(yval)
+if `binarydv'==1 `lvlsof' `y', local(yval)
 capture confirm numeric variable `y'
 if `binarydv'==1 & ("`yval'"!="0 1" | _rc) {
 	local ylab: variable label `y'
 	rename `y' old`y'
-	gegen `y' = group(old`y')
+	`ggen' `y' = group(old`y')
 	replace `y' = `y'-1
 	lab var `y' "`ylab'"
 }
 
 // check if x variable is binary & transform into a dummy if required
-gduplicates report `x'
+`duplrep' `x'
 if r(unique_value)==2 local binaryx = 1
 if r(unique_value)!=2 local binaryx = 0
-if `binaryx'==1 glevelsof `x', local(xval)
+if `binaryx'==1 `lvlsof' `x', local(xval)
 capture confirm numeric variable `x'
 if `binaryx'==1 & ("`xval'"!="0 1" | _rc) {
 	local xlab: variable label `x'
 	rename `x' old`x'
-	gegen `x' = group(old`x')
+	`ggen' `x' = group(old`x')
 	replace `x' = `x'-1
 	lab var `x' "`xlab'"
 }
@@ -304,7 +326,7 @@ if `binarydv'==1 {
 	else {
 		local ylabber old`y'
 	}
-	glevelsof `ylabber', local(oldyvals)
+	`lvlsof' `ylabber', local(oldyvals)
 	foreach kk in `oldyvals' {
 		local ylab: label (`ylabber') `kk'
 	}
@@ -327,7 +349,7 @@ if `binaryx'==1 {
 	else {
 		local xlabber old`x'
 	}
-	glevelsof `xlabber', local(oldxvals)
+	`lvlsof' `xlabber', local(oldxvals)
 	foreach kk in `oldxvals' {
 		local xlab: label (`xlabber') `kk'
 	}
@@ -356,12 +378,17 @@ if "`standardize'"!="" {
 * generate / specify bin variable
 *-------------------------------------------------------------------------------
 
-if "`indslopes'"=="" & "`binvar'"=="" & "`nunibin'"=="" local method quantiles
-if "`indslopes'"=="" & "`binvar'"=="" & "`nunibin'"!="" local method unibin
+if "`indslopes'"=="" & "`binvar'"=="" & "`nunibin'"=="" local indslopes quantiles
+if "`indslopes'"=="" & "`binvar'"=="" & "`nunibin'"!="" local indslopes unibin
 
 if "`indslopes'"=="quantiles" {
     if "`nquantiles'"=="" local nquantiles 10
-	gquantiles `z'_cat = `z' `w', xtile nq(`nquantiles')  
+	if "`slow'"=="" {
+		gquantiles `z'_cat = `z' `w', xtile nq(`nquantiles')  
+	}
+	else {
+		xtile `z'_cat = `z' `w', nq(`nquantiles')  
+	}
 }
 
 else if "`indslopes'"=="unibin" {
@@ -388,8 +415,8 @@ else if "`binvar'"!="" {
     clonevar `z'_cat = `binvar'
 }
 
-gegen zbin = group(`z'_cat)
-glevelsof zbin, local(zlvl)
+`ggen' zbin = group(`z'_cat)
+`lvlsof' zbin, local(zlvl)
 sum zbin 
 local zbinlength = r(max)
 
@@ -536,7 +563,7 @@ if !("`fit'"=="linear" | "`fit'"=="") 	local margpoints 50
 local mcount = 0
 sum `z' `w'
 range `z'_at r(min) r(max) `margpoints'
-glevelsof `z'_at, local(margat)
+`lvlsof' `z'_at, local(margat)
 
 // gather total slope 
 gen `z'_sl = .
@@ -574,7 +601,7 @@ if "`regparameters'"!="" {
 	}
 	*coef, pval, sig
 	if `binarydv'==1 {
-		gstats sum `z'
+		`sumd' `z' `sumd2'
 		local zp50 = r(p50)
 		local zp502 = `zp50'+1
 		est res regm_cont
@@ -646,10 +673,10 @@ if "`regparameters'"!="" {
 * finalize data points
 *-------------------------------------------------------------------------------
 
-gegen `z'_plot = mean(`z') `w', by(zbin)
+`ggen' `z'_plot = mean(`z') `w', by(zbin)
 rename `x'_sl `y'_plot 
-if "`mweighted'"!="" gegen scw = count(`y'_plot), by(zbin)
-gegen tag = tag(zbin) if !mi(`y'_plot)
+if "`mweighted'"!="" `ggen' scw = count(`y'_plot), by(zbin)
+`ggen' tag = tag(zbin) if !mi(`y'_plot)
 replace `y'_plot = . if tag!=1
 
 count if !mi(`y'_plot) & !mi(`z'_plot) //& !mi(`by')
@@ -818,7 +845,7 @@ local wherecoef = 0
 if "`regparameters'"!="" {
 	
 	// figure out where to position the box
-	gstats sum `y'_plot
+	`sumd' `y'_plot `sumd2'
 	local ymax = r(max)
 	local ymin = r(min)
 	local y25 = r(p25)
@@ -827,7 +854,7 @@ if "`regparameters'"!="" {
 	local y75larger = r(N)
 	count if `y'_plot<`y25'
 	local y25smaller = r(N)
-	gstats sum `z'_plot
+	`sumd' `z'_plot `sumd2'
 	local xmax = r(max)
 	local xmin = r(min)
 	local xmean = r(mean)

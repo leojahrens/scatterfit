@@ -1,4 +1,4 @@
-*! version 1.8   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.2   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -24,39 +24,56 @@ LEGINside LEGSize(string)
 MWeighted MSize(string) MLabel(varlist max=1)
 scale(string) XYSize(string)
 PLOTScheme(string asis) COLorscheme(string asis) CINTensity(numlist max=1)
-opts(string asis)
+opts(string asis) slow
 
 /* legacy and dev */
 BINARYModel(string)
 polybw(numlist max=1) 
 COVariates(varlist) ABSorb(varlist)
 coef COEFPos(string) COEFPLace(string)
-loud
 ] ;
 
 #delimit cr
 
 *-------------------------------------------------------------------------------
-* install dependencies
+* prep dependencies
 *-------------------------------------------------------------------------------
 
-local gtoolsu = 0
-local paletteu = 0
-foreach package in reghdfe gtools ftools labmask {
+// install
+foreach package in reghdfe ftools labmask {
 	capture which `package'
-	if _rc==111 & "`package'"=="gtools" local gtoolsu = 1 
 	if _rc==111 ssc install `package', replace
 }
-if `gtoolsu'==1 gtools, upgrade
+capture which gtools
+if _rc==111 & "`slow'"=="" {
+	ssc install gtools, replace 
+	gtools, upgrade
+}
 capture which colorpalette
-if _rc==111 local paletteu = 1
-if `paletteu'==1 ssc install colrspace, replace
-if `paletteu'==1 ssc install palettes, replace
+if _rc==111 {
+	ssc install colrspace, replace
+	ssc install palettes, replace
+}
 capture set scheme plotplain
 if _rc==111 ssc install blindschemes, replace
 if inlist("`fitmodel'","quantile","mmreg") {
 	capture which robreg
 	if _rc==111 ssc install robreg, replace
+}
+
+// prep no gtools option 
+if "`slow'"!="" {
+	local lvlsof levelsof
+	local sumd sum 
+	local sumd2 , d
+	local ggen egen
+	local duplrep duplicates report
+}
+else {
+	local lvlsof glevelsof
+	local sumd gstats sum
+	local ggen gegen
+	local duplrep gduplicates report
 }
 
 
@@ -122,10 +139,10 @@ if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit")
 	exit 498
 }
 if "`if'"!="" {
-    gduplicates report `y' `if' & !mi(`y'), fast
+    `duplrep' `y' `if' & !mi(`y')
 }
 else {
-    gduplicates report `y' `if' if !mi(`y'), fast
+    `duplrep' `y' `if' if !mi(`y')
 }
 local yvalcount = r(unique_value)
 if `yvalcount'==2 {
@@ -304,7 +321,7 @@ keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `cluster
 // check if suitable by variable is specified, generate one otherwise
 local isthereby = 0
 if "`by'"!="" {
-	levelsof `by', local(byvals)
+	`lvlsof' `by', local(byvals)
 	local byvalcount: word count `byvals'
 	if `byvalcount'!=1 {
 		local isthereby = 1
@@ -321,7 +338,7 @@ if `isthereby'==0 {
 capture confirm numeric variable `by'
 if _rc {
 	rename `by' oldby
-	gegen `by' = group(oldby)
+	`ggen' `by' = group(oldby)
 	labmask `by', values(oldby)
 }
 
@@ -333,7 +350,7 @@ if `isthereby'==1 {
 }
 
 // by locals
-levelsof `by', local(bynum)
+`lvlsof' `by', local(bynum)
 if `isthereby'==1 & "`bymethod'"=="stratify" {
 	local bynumalt `bynum'
 }
@@ -360,12 +377,12 @@ if `isthereby'==1 {
 // check if dependent variable is binary & transform into a dummy if required
 if `yvalcount'==2 local binarydv = 1
 if `yvalcount'!=2 local binarydv = 0
-if `binarydv'==1 glevelsof `y', local(yval)
+if `binarydv'==1 `lvlsof' `y', local(yval)
 capture confirm numeric variable `y'
 if `binarydv'==1 & ("`yval'"!="0 1" | _rc) {
 	local ylab: variable label `y'
 	rename `y' old`y'
-	gegen `y' = group(old`y')
+	`ggen' `y' = group(old`y')
 	replace `y' = `y'-1
 	lab var `y' "`ylab'"
 }
@@ -383,7 +400,7 @@ if `binarydv'==1 {
 	else {
 		local ylabber old`y'
 	}
-	levelsof `ylabber', local(oldyvals)
+	`lvlsof' `ylabber', local(oldyvals)
 	foreach kk in `oldyvals' {
 		local ylab: label (`ylabber') `kk'
 	}
@@ -422,7 +439,16 @@ if "`binned'"!="" {
 	if "`nquantiles'"=="" local nquantiles 30
 	if "`binvar'"=="" {
 		if "`discrete'"=="" & "`unibin'"=="" { // quantiles
-			gquantiles `x'_q = `x' `w', xtile nq(`nquantiles') `byparen'  
+			if "`slow'"=="" {
+				gquantiles `x'_q = `x' `w', xtile nq(`nquantiles') `byparen'  
+			}
+			else {
+				gen `x'_q = .
+				foreach bynum2 in `bynum' {
+					xtile `x'_q`bynum2' = `x' if `by'==`bynum2' `w', nq(`nquantiles')
+					replace  `x'_q = `x'_q`bynum2' if `by'==`bynum2'
+				}
+			}
 		}
 		else if "`unibin'"=="" {  // discrete
 			clonevar `x'_q = `x'  
@@ -452,7 +478,7 @@ if "`binned'"=="" & "`mweighted'"!="" {
 }
 
 if "`binned'"!="" | "`mweighted'"!="" {
-	gegen xbin = group(`x'_q `by')
+	`ggen' xbin = group(`x'_q `by')
 }
 
 
@@ -800,10 +826,10 @@ if "`controls'`fcontrols'"!="" {
 
 if "`binned'"!="" {
 	if "`binmethod'"=="" local binmethod mean
-	gegen `y'_mean = `binmethod'(`y') `w', by(xbin)
-	gegen `x'_mean = `binmethod'(`x') `w', by(xbin)
-	if "`mweighted'"!="" gegen scw = count(`y'), by(xbin)
-	gegen tag = tag(xbin) if !mi(`y'_mean)
+	`ggen' `y'_mean = `binmethod'(`y') `w', by(xbin)
+	`ggen' `x'_mean = `binmethod'(`x') `w', by(xbin)
+	if "`mweighted'"!="" `ggen' scw = count(`y'), by(xbin)
+	`ggen' tag = tag(xbin) if !mi(`y'_mean)
 	replace `y'_mean = . if tag!=1
 }
 
@@ -978,7 +1004,7 @@ else {
 
 // marker size weight
 if "`mweighted'"!="" {
-	if "`binned'"=="" gegen scw = count(`y'), by(xbin)
+	if "`binned'"=="" `ggen' scw = count(`y'), by(xbin)
 	sum scw 
 	replace scw = scw/r(mean)
 	local scw [w=scw]
@@ -1033,7 +1059,7 @@ local wherecoef = 0
 if "`regparameters'"!="" {
 	
 	// figure out where to position the box
-	gstats sum `yplot'
+	`sumd' `yplot' `sumd2'
 	local ymax = r(max)
 	local ymin = r(min)
 	local y25 = r(p25)
@@ -1042,7 +1068,7 @@ if "`regparameters'"!="" {
 	local y75larger = r(N)
 	count if `yplot'<`y25'
 	local y25smaller = r(N)
-	gstats sum `xplot'
+	`sumd' `xplot' `sumd2'
 	local xmax = r(max)
 	local xmin = r(min)
 	local xmean = r(mean)
@@ -1255,11 +1281,11 @@ if `isthereby'==0 {
 }
 
 if `isthereby'==1 {
-	gegen distinctby = group(`by')
+	`ggen' distinctby = group(`by')
 	sum distinctby
 	local maxdistinctby = r(max)
 	local coln = 0
-	levelsof `by', local(bynum)
+	`lvlsof' `by', local(bynum)
 	foreach bynum2 in `bynum' {
 		if `isbyvarlabeled'==1 local legbyvarl`bynum2' `bylab`bynum2''
 		if `isbyvarlabeled'==0 local legbyvarl`bynum2' `by'==`bynum2'
@@ -1407,6 +1433,7 @@ tw `xdistr' `sce' `sc' `cis' `pl', `lscatteropts'
 restore
 }
 end
+
 
 
 
