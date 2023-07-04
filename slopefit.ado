@@ -1,4 +1,4 @@
-*! version 1.8.2   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.3   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 15
@@ -45,19 +45,24 @@ foreach package in reghdfe ftools labmask {
 	capture which `package'
 	if _rc==111 ssc install `package', replace
 }
-capture which gtools
-if _rc==111 & "`slow'"=="" {
-	ssc install gtools, replace 
-	gtools, upgrade
+if "`slow'"=="" {
+	capture which gtools
+	if _rc==111 {
+		ssc install gtools, replace 
+		gtools, upgrade
+	}
 }
 capture which colorpalette
 if _rc==111 {
 	ssc install colrspace, replace
 	ssc install palettes, replace
 }
-capture set scheme plotplain
-if _rc==111 ssc install blindschemes, replace
-if inlist("`fitmodel'","quantile","mmreg") {
+capture findfile blindschemes.sthlp
+if _rc!=0 {
+	capture set scheme plotplain
+	if _rc==111 ssc install blindschemes, replace
+}
+if strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg") {
 	capture which robreg
 	if _rc==111 ssc install robreg, replace
 }
@@ -74,7 +79,7 @@ else {
 	local lvlsof glevelsof
 	local sumd gstats sum
 	local ggen gegen
-	local duplrep gduplicates report
+	local duplrep gdistinct
 }
 
 
@@ -134,13 +139,11 @@ foreach mm in x z y {
 		exit 498
 	}
 }
-if "`if'"!="" {
-    `duplrep' `y' `if' & !mi(`y')
-}
-else {
-    `duplrep' `y' `if' if !mi(`y')
-}
-local yvalcount = r(unique_value)
+if "`if'"!="" local ifhelp &
+if "`if'"=="" local ifhelp if
+`duplrep' `y' `if' `ifhelp' !mi(`y')
+if "`slow'"=="" local yvalcount = r(ndistinct)
+if "`slow'"!="" local yvalcount = r(unique_value)
 if "`binarymodel'"!="" & `yvalcount'!=2 {
 	di as error "Logit/probit/LPM models require a binary dependent variable."
 	exit 498
@@ -369,8 +372,17 @@ local ytitle ytitle("Effect of `xlab'" "on `ylab'")
 
 // standardize x and y
 if "`standardize'"!="" {
-	if `binarydv'==0 gstats transform (standardize) `y' `x' `w', replace
-	if `binarydv'==1 gstats transform (standardize) `x' `w', replace
+	if "`slow'"=="" {
+		if `binarydv'==0 gstats transform (standardize) `y' `x' `w', replace labelformat(#sourcelabel#)
+		if `binarydv'==1 gstats transform (standardize) `x' `w', replace labelformat(#sourcelabel#)
+	}
+	else {
+		if `binarydv'==0 local stdlist `y'	
+		foreach bb in `x' `stdlist' {
+			sum `bb' `w'
+			replace `bb' = (`bb'-r(mean))/r(sd)
+		}
+	}
 }
 
 
@@ -400,9 +412,9 @@ else if "`indslopes'"=="unibin" {
 	range binrange r(min) r(max) `nunibin'
 	foreach bb of numlist 1/`nunibin' {
 		local bincount = `bincount'+1
-		qui sum binrange if _n==`bb'+1
+		qui sum binrange if _n==`bb'+1, meanonly
 		local binrange1 = r(mean)
-		qui sum binrange if _n==`bb'
+		qui sum binrange if _n==`bb', meanonly
 		replace `z'_cat = `bb' if `z'>=r(mean) & `z'<`binrange1'
 	}
 }
@@ -617,6 +629,7 @@ if "`regparameters'"!="" {
 	if `pval'<.01 local siglevel = .01
 
 	// round and store parameters	
+	local space " "
 	foreach par in nobs r2 adjr2 coef pval {
 		local smallround`par' = 0
 		if ``par''>=10 | ``par''<=-10 {
@@ -644,15 +657,15 @@ if "`regparameters'"!="" {
 		cap if strpos("``par'string'","e") & ``par''<0 local smallround`par' = -1
 		local `par' = round(``par'',``par'round')
 		if `smallround`par''==0 {
-			local `par' "=``par''"
+			local `par' "`space'=`space'``par''"
 		}
 		else if `smallround`par''==1 {
-			local `par' "<.00001"
+			local `par' "`space'<`space'.00001"
 		}
 		else {
-			local `par' "{&cong}0"
+			local `par' "`space'{&cong}`space'0"
 		}
-		if strpos("``par''","000000") & "``par''"!="<.00001" {
+		if strpos("``par''","000000") & "``par''"!="`space'<`space'.00001" {
 			foreach zz of numlist 1/9 {
 				if substr("``par''",`zz',1)=="." local dotpos = `zz'
 			}
@@ -801,7 +814,7 @@ else {
 
 // marker size weight
 if "`mweighted'"!="" {
-	sum scw 
+	sum scw, meanonly
 	replace scw = scw/r(mean)
 	local scw [w=scw]
 }
@@ -1087,6 +1100,7 @@ tw `zdistr' `isl' `sce' `sc' `cis' `pl', `lscatteropts'
 restore
 }
 end
+
 
 
 

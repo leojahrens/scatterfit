@@ -1,11 +1,11 @@
-v 1.8.2
+v 1.8.3
 d scatterfit. Scatterplot with fit lines
 d
 d Leo Ahrens, Freie Universität Berlin
 d
 d Requires Stata 15 and the following packages: reghdfe, gtools, ftools, palettes, colrspace, blindschemes, labutil
 d
-d Distribution-Date: 20230630
+d Distribution-Date: 20230704
 d Support: leo@ahrensmail.de
 f scatterfit.ado 
 f scatterfit.sthlp
