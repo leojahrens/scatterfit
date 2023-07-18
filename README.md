@@ -4,7 +4,7 @@ This is a Stata package that produces a wide range of scatter plots with overlai
 
 The package can be installed by executing in Stata:
 ```
-net install scatterfit, from(https://raw.githubusercontent.com/leojahrens/scatterfit/master) replace
+net install scatterfit, from("https://raw.githubusercontent.com/leojahrens/scatterfit/master") replace
 ```
 
 Or download from SSC:
