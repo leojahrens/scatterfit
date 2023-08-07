@@ -1,4 +1,4 @@
-*! version 1.8.3   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.4   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -40,7 +40,7 @@ coef COEFPos(string) COEFPLace(string)
 *-------------------------------------------------------------------------------
 
 // install
-foreach package in reghdfe ftools labmask {
+foreach package in reghdfe ftools {
 	capture which `package'
 	if _rc==111 ssc install `package', replace
 }
@@ -56,6 +56,8 @@ if _rc==111 {
 	ssc install colrspace, replace
 	ssc install palettes, replace
 }
+capture which labmask
+if _rc==111 ssc install labutil, replace
 capture findfile blindschemes.sthlp
 if _rc!=0 {
 	capture set scheme plotplain
