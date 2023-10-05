@@ -20,11 +20,11 @@ yvar xvar {ifin}
 {syntab:Fit}
 {synopt :{opt fit(str)}}Functional form of the fit line. May be {it:linear}, {it:quadratic} for a second polynomial, {it:cubic} for a third polynomial, {it:lpoly} for a local polynomial fit, or {it:lowess} for a lowess smoother.{p_end}
 {synopt :{opt fitm:odel(model)}}Changes the regression model used to estimate the fit line. See the table below the options for a full list of supported models.{p_end}
-{synopt :{opt bw:idth(num)}} Bandwidth for the local polynomial / lowess smoother fit line. {p_end}
+{synopt :{opt bw:idth(num)}} Bandwidth for the local polynomial / lowess smoother fit line.{p_end}
 
 {syntab:Confidence intervals and standard errors}
 {synopt :{opt ci}}Includes 95% confidence intervals.{p_end}
-{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of the respective regression model.{p_end}
+{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of the respective regression model as well as {it:vce(wbcluster clustervar)} for wild cluster bootstrap.{p_end}
 {synopt :{opt l:evel(num)}}Changes the confidence level of the CIs.{p_end}
 
 {syntab:Bins}
@@ -35,8 +35,9 @@ yvar xvar {ifin}
 {synopt :{opt binv:ar(varlist)}}Plots the means of {it:yvar} and {it:xvar} within each distinct value of {it:varlist}. Used when the bins are already defined in the dataset.{p_end}
 {synopt :{opt binm:ethod(str)}}Specifies how data points are aggregated within bins. May be {it:mean} (the standard) or {it:median}.{p_end}
 
-{syntab:Multiple plots}
+{syntab:Subsample analysis}
 {synopt :{opt by(var)}}Draws separate scatterplots and fit lines for each value of {it:var}.{p_end}
+{synopt :{opt onef:it}}Only plots a single fit line when {it:by()} is specified.{p_end}
 {synopt :{opt bym:ethod(str)}}Defines whether the results are derived from separate analyses of stratified samples ({opt bymethod(stratify)}) or a unified regression model containing interaction terms ({opt bymethod(interact)}).{p_end}
 
 {syntab:Conditioning on covariates}

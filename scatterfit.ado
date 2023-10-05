@@ -1,4 +1,4 @@
-*! version 1.8.4   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.5   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -9,10 +9,10 @@ version 15
 	
 #delimit ;
 
-syntax varlist(min=2 max=2)	[if] [in] [aweight fweight] , [
+syntax varlist(min=2 max=2 numeric)	[if] [in] [aweight fweight] , [
 
 fit(string) ci FITModel(string asis) BWidth(numlist max=1)  
-by(string) BYMethod(string)
+by(string) BYMethod(string) ONEFit
 BINned BINMethod(string) DISCrete NQuantiles(numlist max=1) BINVar(varlist max=1) UNIBin(numlist max=1)
 Controls(varlist numeric fv) Fcontrols(varlist)     
 REGParameters(string) PARPos(string) PARSize(string)
@@ -134,13 +134,6 @@ if "`binarymodel'"=="logit" local fitmodel logit
 if "`binarymodel'"=="probit" local fitmodel probit
 
 // x and y variables
-foreach mm in x y {
-	capture confirm numeric variable ``mm''
-	if _rc {
-		di as error "{it:`mm'var} must be numeric."
-		exit 498
-	}
-}
 if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit") {
 	di as error "{bf:binarymodel()} must contain logit or probit."
 	exit 498
@@ -162,13 +155,16 @@ if `yvalcount'==2 {
 	if "`binned'"=="" {
 		di as error "It is advised to use the binned option with binary dependent variables."
 	}
+	if strpos("`vce'","wbcluster") {
+		di as error "Stata has no native support for wild cluster bootstrap with logit/probit models. The results are obtained from OLS."
+	}
 }
 if ("`fitmodel'"=="probit" | "`fitmodel'"=="logit" | "`fitmodel'"=="lpm") & `yvalcount'!=2 {
 	di as error "Logit/probit/LPM models require a binary dependent variable."
 	exit 498
 }
 
-// by method
+// by
 if "`bymethod'"!="" {
 	if "`bymethod'"!="interact" & "`bymethod'"!="stratify" & "`bymethod'"!="int" & "`bymethod'"!="strat" {
 		di as error "Only {bf:bymethod({it:stratify})} and {bf:bymethod({it:interact})} are allowed."
@@ -176,6 +172,16 @@ if "`bymethod'"!="" {
 	}
 	if "`by'"=="" {
 		di as error "{bf:bymethod()} requires {bf:by()}."
+		exit 498
+	}
+}
+if "`onefit'"!="" {
+	if "`by'"=="" {
+		di as error "The option {it:onefit} requires {it:by()}."
+		exit 498
+	}
+	if "`bymethod'"=="interact" | "`bymethod'"=="int" {
+		di as error "The option {it:onefit} cannot be combined with {it:bymethod(interact)}."
 		exit 498
 	}
 }
@@ -190,34 +196,41 @@ if "`bwidth'"!="" & !("`fit'"=="lowess" | "`fit'"=="lpoly") {
 	exit 498
 }
 
-// fit model correct?
-if "`fitmodel'"!="" & !inlist("`fitmodel'","ols","poisson","logit","probit","flogit","fprobit","lpm") & !(strpos("`fitmodel'","randomint") | strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg")) {
-	di as error "fitmodel() must be set to {it:ols}, {it:poisson}, {it:quantile}, {it:randomint}, {it:flogit}, {it:fprobit}, {it:logit}, {it:probit}, or {it:lpm}."
-	exit 498
-}
-if strpos("`fitmodel'","randomint") {
-	local strtest = subinstr("`fitmodel'", "randomint", "",.)
-	if "`strtest'"=="" {
-		di as error "You need to specify the higher level cluster of the multilevel model using fitmodel(randomint, cluster(varname))."
+// fit model
+if "`fitmodel'"!="" {
+	if !inlist("`fitmodel'","ols","poisson","logit","probit","flogit","fprobit","lpm") & !(strpos("`fitmodel'","randomint") | strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg")) {
+		di as error "fitmodel() must be set to {it:ols}, {it:poisson}, {it:quantile}, {it:randomint}, {it:flogit}, {it:fprobit}, {it:logit}, {it:probit}, or {it:lpm}."
 		exit 498
 	}
-	else {
-		local rintcluster = subinstr(subinstr(subinstr(subinstr("`fitmodel'", "reml", "",.), ")", "",.),",","",.),"(","",.)
-		local rintcluster = subinstr(subinstr("`rintcluster'","cluster","",.),"randomint", "",.)
-		cap qui sum `rintcluster'
-		if _rc di as error "Something went wrong. Please use this syntax for specifying a random intercepts model:  fitmodel(randomint, cluster(varname)) - optionally you can also include {it:reml} in the brackets."
-		if _rc exit 498
+	if strpos("`fitmodel'","randomint") {
+		local strtest = subinstr("`fitmodel'", "randomint", "",.)
+		if "`strtest'"=="" {
+			di as error "You need to specify the higher level cluster of the multilevel model using fitmodel(randomint, cluster(varname))."
+			exit 498
+		}
+		else {
+			local rintcluster = subinstr(subinstr(subinstr(subinstr("`fitmodel'", "reml", "",.), ")", "",.),",","",.),"(","",.)
+			local rintcluster = subinstr(subinstr("`rintcluster'","cluster","",.),"randomint", "",.)
+			cap qui sum `rintcluster'
+			if _rc di as error "Something went wrong. Please use this syntax for specifying a random intercepts model: fitmodel(randomint, cluster(varname)) - optionally you can also include {it:reml} in the brackets."
+			if _rc exit 498
+		}
 	}
-}
-if strpos("`fitmodel'","quantile") {
-	local qregquant = subinstr(subinstr(subinstr("`fitmodel'", ")", "",.), "(", "",.), ",", "",.)
-	local qregquant = subinstr(subinstr(subinstr("`qregquant'", "p", "",.), "quantile", "",.)," ","",.)
-	cap dis `qregquant'*1
-	if _rc & "`qregquant'"!="" {
-		di as error "Something went wrong. Please use this syntax for specifying a quantile regression model: {it:fitmodel(quantile, p(x))}, where x is a quantile between 0 and 100."
+	if strpos("`fitmodel'","quantile") {
+		local qregquant = subinstr(subinstr(subinstr("`fitmodel'", ")", "",.), "(", "",.), ",", "",.)
+		local qregquant = subinstr(subinstr(subinstr("`qregquant'", "p", "",.), "quantile", "",.)," ","",.)
+		cap dis `qregquant'*1
+		if _rc & "`qregquant'"!="" {
+			di as error "Something went wrong. Please use this syntax for specifying a quantile regression model: {it:fitmodel(quantile, p(x))}, where x is a quantile between 0 and 100."
+			exit 498
+		}
+	}
+	if strpos("`vce'","wbcluster") {
+		di as error "fitmodel() cannot be used when wild cluster bootstrap SEs are estimated."
 		exit 498
 	}
 }
+
 
 // binned options
 if ("`discrete'"!="" | "`binvar'"!="" | "`unibin'"!="" | "`nquantiles'"!="") & "`binned'"=="" {
@@ -296,13 +309,24 @@ if "`xdistribution'"!="" {
 	}
 }
 
-
 *-------------------------------------------------------------------------------
 * drop superfluous observations and variables
 *-------------------------------------------------------------------------------
 
 // preserve original data
 preserve
+
+// make variables numeric if required
+if "`by'`fcontrols'"!="" {
+	foreach v of varlist `fcontrols' `by' {
+		capture confirm numeric variable `x'
+		if _rc {
+			rename `x' _`x'
+			`ggen' `x' = group(_`x')
+			labmask `x', values(_`x')
+		}
+	}
+}
 
 // clean dataset
 if "`controls'`fcontrols'"!="" | "`binvar'"!="" | "`mlabel'"!="" {
@@ -314,9 +338,9 @@ if "`by'"!="" local bydrop | mi(`by')
 drop if mi(`x') | mi(`y') `covdrop' `bydrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
-if strpos("`vce'","cluster") local clustervar: subinstr local vce "cluster" "", all
-if strpos("`fitmodel'","cluster") local clustervar2 `rintcluster'
-keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar' `clustervar2'
+if strpos("`vce'","cluster") & !strpos("`vce'","wbcluster") local clustervar: subinstr local vce "cluster" "", all
+if strpos("`vce'","wbcluster") local clustervar: subinstr local vce "wbcluster" "", all
+keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
 
 
 *-------------------------------------------------------------------------------
@@ -338,13 +362,10 @@ if `isthereby'==0 {
 	gen sfitbyvar = 1
 	local by sfitbyvar
 }
-
-// make by variable numeric if necessary
-capture confirm numeric variable `by'
-if _rc {
-	rename `by' oldby
-	`ggen' `by' = group(oldby)
-	labmask `by', values(oldby)
+if "`onefit'"!="" {
+	gen sfitaltbyvar = 1
+	local altby sfitaltbyvar
+	local ogby `by'
 }
 
 // set bymethod
@@ -358,6 +379,11 @@ if `isthereby'==1 {
 `lvlsof' `by', local(bynum)
 if `isthereby'==1 & "`bymethod'"=="stratify" {
 	local bynumalt `bynum'
+	if "`onefit'"!="" {
+		local bynumalt2 1
+		local ogbynum `bynum'
+		local ogbynumalt `bynumalt'
+	}
 }
 else {
 	local bynumalt xxx
@@ -500,8 +526,8 @@ if "`binned'"!="" | "`mweighted'"!="" {
 * specify if own predictions & CIs should be used in final plot, and which
 *-------------------------------------------------------------------------------
 
-if ((`isthereby'==1 & "`bymethod'"=="interact") | "`controls'`fcontrols'"!="" | "`vce'"!="" | `binarydv'==1 | "`fit'"=="cubic" | !("`fitmodel'"=="ols" | "`fitmodel'"=="")) ///
-	& "`fit'"!="lpoly" & "`fit'"!="lowess" {
+if "`fit'"!="lpoly" & "`fit'"!="lowess" & ((`isthereby'==1 & "`bymethod'"=="interact") | ///
+"`controls'`fcontrols'"!="" | "`vce'"!="" | `binarydv'==1 | "`fit'"=="cubic" | !("`fitmodel'"=="ols" | "`fitmodel'"=="")) {
 	local ownpred_plot = 1
 }
 else {
@@ -515,10 +541,19 @@ if "`ci'"!="" {
 	local cilvltext `level'%
 }
 
+
 *-------------------------------------------------------------------------------
 * estimate and store regression
 *-------------------------------------------------------------------------------
 
+// adapt to onefit option 
+if "`onefit'"!="" {
+	local by `altby'
+	local bynum `bynumalt2'
+	local bynumalt `bynum'
+}
+
+// regressions
 if `ownpred_plot'==1 | "`regparameters'"!="" {
 
 	// prepare specification
@@ -528,7 +563,7 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 	if "`bymethod'"=="interact" local `x'marg ``x'marg'##i.`by'
 	
 	// choose correct regression model
-	if "`fitmodel'"=="" {
+	if "`fitmodel'"=="" & !strpos("`vce'","wbcluster") {
 	    if `binarydv'==0 local model reghdfe 
 		if `binarydv'==1 local model logit 
 	}
@@ -543,6 +578,7 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 		if strpos("`fitmodel'","quantile") local model robreg q
 		if strpos("`fitmodel'","randomint") & `binarydv'==0 local model mixed
 		if strpos("`fitmodel'","randomint") & `binarydv'==1 local model melogit
+		if strpos("`vce'","wbcluster") local model wildboot reg
 	}
 	
 	// full regression variable specification
@@ -560,8 +596,8 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 	if "`fcontrols'"=="" local hdfeabsorb noabsorb
 	if "`fcontrols'"!="" local hdfeabsorb absorb(`fcontrols')
 	if "`vce'"!="" local vce vce(`vce')
-	local regmodelopts `vce'
-	
+	if "`model'"!="wildboot reg" local regmodelopts `vce'
+
 	if "`model'"=="reghdfe" {
 	    local regmodelopts `regmodelopts' `hdfeabsorb'
 	}
@@ -571,6 +607,10 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 		foreach cl in `rintcluster' {
 		    local regvars `regvars' || `cl':
 		}
+	}
+	
+	else if "`model'"=="wildboot reg" {
+		local regmodelopts `regmodelopts' cluster(`clustervar') coef(`x')
 	}
 	
 	else if "`model'"=="robreg q" {
@@ -594,9 +634,13 @@ if `ownpred_plot'==1 | "`regparameters'"!="" {
 		`model' `y' `regvars' `w', `regmodelopts'
 		est sto regmodel
 	}
+	
+	// prep margins unconditional option 
+	*if "`fitmodel'"=="wcbootstrap" | strpos("`vce'","vce(clust") |strpos("`vce'","vce(r") | ///
+	*strpos("`vce'","vce(hc") local marguncond vce(unconditional)
 }
 
-	
+
 *-------------------------------------------------------------------------------
 * gather regression parameters
 *-------------------------------------------------------------------------------
@@ -605,7 +649,7 @@ if "`regparameters'"!="" {
 	
 	// gather regression parameters
 	foreach bynum2 in `bynumalt' {
-		if `isthereby'==1 & "`bymethod'"=="stratify" local bynumname `bynum2'
+		if `isthereby'==1 & "`bymethod'"=="stratify" & "`onefit'"=="" local bynumname `bynum2'
 
 		* r2, nobs
 		est res regmodel`bynumname'
@@ -622,10 +666,14 @@ if "`regparameters'"!="" {
 
 	* coef, se, pval
 	foreach bynum2 in `bynum' {
-		if `isthereby'==1 & "`bymethod'"=="stratify" local bynumname `bynum2'
+		if `isthereby'==1 & "`bymethod'"=="stratify" & "`onefit'"=="" local bynumname `bynum2'
 		if `isthereby'==1 & "`bymethod'"=="interact" local atbymarg at(`by'=`bynum2')
 		est res regmodel`bynumname'
-		margins, dydx(`x') `atbymarg' 
+		if "`onefit'"!="" { // weird fix, no idea why this fails otherwise
+			gen __smple=1
+			estimates esample: if __smple
+		}
+		margins, dydx(`x') `atbymarg' `marguncond' post
 		local coef`bynum2' = r(table)[1,1]
 		local se`bynum2' = r(table)[2,1]
 		local pval`bynum2' = r(table)[4,1]
@@ -643,7 +691,7 @@ if "`regparameters'"!="" {
 		local count = 0
 		local intmargchecker " "
 		est res regmodel
-		margins, dydx(`x') at(`by'=(`bynum')) post 
+		margins, dydx(`x') at(`by'=(`bynum')) `marguncond' post 
 		foreach bynum2 in `bynum' {
 			local count = `count'+1
 			local count2 = 0
@@ -670,7 +718,7 @@ if "`regparameters'"!="" {
 	}
 
 	// round and store parameters
-	if `isthereby'!=1 | (!strpos("`regparameters'","pval") & !strpos("`regparameters'","se") & ///
+	if `isthereby'!=1 | "`onefit'"!="" | (!strpos("`regparameters'","pval") & !strpos("`regparameters'","se") & ///
 	!strpos("`regparameters'","r2") & !strpos("`regparameters'","nobs")) local space " "
 	
 	foreach bynum2 in `bynum' {
@@ -679,7 +727,7 @@ if "`regparameters'"!="" {
 		}
 	}	
 	foreach bynum2 in `bynumalt' {
-		if `isthereby'==1 & "`bymethod'"=="stratify" local bynumname `bynum2'
+		if `isthereby'==1 & "`bymethod'"=="stratify" & "`onefit'"=="" local bynumname `bynum2'
 		foreach par in r2 adjr2 nobs {
 			local parbycompiler `parbycompiler' `par'`bynumname'
 		}
@@ -780,10 +828,10 @@ if `ownpred_plot'==1 {
 		}
 		
 		// predict and store values
-		if "`bymethod'"=="stratify" local regmodelname `bynum2'
+		if "`bymethod'"=="stratify" & "`onefit'"=="" local regmodelname `bynum2'
 		if `isthereby'==1 & "`bymethod'"=="interact" local margbysetting `by'=(`bynum2')
 		est res regmodel`regmodelname'	
-		margins, at(`x'=(`margat`bynum2'') `margbysetting') `atmean' `cilvl'  post
+		margins, at(`x'=(`margat`bynum2'') `margbysetting') `atmean' `cilvl' `marguncond'  post
 		foreach num of numlist 1/`mcount' {
 			replace cix`bynum2' = `ranger`num'' if _n==`num'
 			replace cil`bynum2' = r(table)[5,`num'] if _n==`num'
@@ -791,6 +839,13 @@ if `ownpred_plot'==1 {
 			replace pe`bynum2' = r(table)[1,`num'] if _n==`num'
 		}
 	}
+}
+
+// revert onefit changes to by locals
+if "`onefit'"!="" {
+	local by `ogby'
+	local bynum `ogbynum'
+	local bynumalt `ogbynumalt'
 }
 
 
@@ -885,7 +940,7 @@ if `binarydv'==1 & "`fcontrols'`controls'"!="" & "`binned'"!="" & "`fitmodel'"!=
 *-------------------------------------------------------------------------------
 
 if "`colorscheme'"=="" {
-	local cpal `" "210 0 0" "49 113 166" "15 137 1" "255 127 14" "169 58 228" "41 217 231" "250 238 22"  "222 115 50" "'
+	local cpal `" "210 0 0" "49 113 166" "255 127 14" "15 137 1" "169 58 228" "41 217 231" "250 238 22"  "222 115 50" "'
 }
 else {
 	local cpal `colorscheme'
@@ -916,24 +971,26 @@ if "`plotscheme'"=="" {
 	xsc(lc(gs5) lw(thin)) xlab(#6, labs(*1.05) tlc(gs5) tlw(thin) glc(gs13) glp(solid) glw(thin) gmin gmax)
 	
 	foreach i of numlist 1/8 {
+		local i2 = `i'
+		if "`onefit'"!="" local ++i2
 		local mlines`i' lc(`c`i'') lw(medthick)
 		local mlinesci`i' fc(`c`i'o30') fi(*2.4) alw(none) clc(`c`i'') clw(medthick)
 		local ciareas`i' lw(none) fc(`c`i'o30')
-		local xdistareas`i' lw(none) fc(`c`i'o50')
-		local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlabc(`c`i'') mlw(thin)
+		local xdistareas`i' lw(none) fc(`c`i2'o50')
+		local mfullscatterm`i' mfc(`c`i2'o50') mlc(`c`i2'') mlabc(`c`i2'') mlw(thin)
 		local efullscatterm`i' `mfullscatterm`i''
 		if `i'<5 local howthin mlw(vthin)
 		if `i'>=5 local howthin mlw(medium)
-		local mscatter75m`i' mfc(`c`i'o50') mlc(`c`i'o75') mlabc(`c`i'o80') `howthin' mlalign(inside)
+		local mscatter75m`i' mfc(`c`i2'o50') mlc(`c`i2'o75') mlabc(`c`i2'o75') `howthin' mlalign(inside)
 		local escatter75m`i' `mscatter75m`i''
 		foreach h of numlist 25 50  {
 			if `i'<5 {
 				local hollow mlw(none) mlalign(outside)
 			}
 			else {
-				local hollow mlw(medium) mlalign(inside) mlc(`c`i'o`h'')
+				local hollow mlw(medium) mlalign(inside) mlc(`c`i2'o`h'')
 			}
-			local mscatter`h'm`i' mfc(`c`i'o`h'') mlabc(`c`i'o`h'') `hollow'
+			local mscatter`h'm`i' mfc(`c`i2'o`h'') mlabc(`c`i2'o`h'') `hollow'
 			local escatter`h'm`i' `mscatter`h'm`i''
 		}
 	}
@@ -998,15 +1055,17 @@ else {
 	local scheme scheme(`plotscheme')
 	if "`colorscheme'"!="" {
 		foreach i of numlist 1/8 {
+			local i2 = `i'
+			if "`onefit'"!="" local ++i2
 			local mlines`i' lc(`c`i'') lw(medthick)
 			local mlinesci`i' acol(`c`i'o50') alw(none) clc(`c`i'') clw(medthick)
 			local ciareas`i' lw(none) fc(`c`i'o30')
-			local mfullscatterm`i' mfc(`c`i'o50') mlc(`c`i'') mlabc(`c`i'') mlw(thin) msize(`mresize')
+			local mfullscatterm`i' mfc(`c`i2'o50') mlc(`c`i2'') mlabc(`c`i2'') mlw(thin) msize(`mresize')
 			local efullscatterm`i' `mfullscatterm`i''
-			local mscatter75m`i' mfc(`c`i'o50') mlc(`c`i'o75') mlabc(`c`i'o80') mlw(vthin) mlalign(inside) msize(`mresize')
+			local mscatter75m`i' mfc(`c`i2'o50') mlc(`c`i2'o75') mlabc(`c`i2'o80') mlw(vthin) mlalign(inside) msize(`mresize')
 			local escatter75m`i' `mscatter75m`i''
 			foreach h of numlist 25 50  {
-				local mscatter`h'm`i' mfc(`c`i'o`h'') mlabc(`c`i'o`h'') mlalign(outside) mlw(none) msize(`mresize')
+				local mscatter`h'm`i' mfc(`c`i2'o`h'') mlabc(`c`i2'o`h'') mlalign(outside) mlw(none) msize(`mresize')
 				local escatter`h'm`i' `mscatter`h'm`i''
 			}
 		}
@@ -1073,6 +1132,13 @@ foreach ff of numlist 1/9 {
 
 local wherecoef = 0
 if "`regparameters'"!="" {
+
+	// adapt to onefit option 
+	if "`onefit'"!="" {
+		local by `altby'
+		local bynum `bynumalt2'
+		local bynumalt `bynum'
+	}
 	
 	// figure out where to position the box
 	`sumd' `yplot' `sumd2'
@@ -1132,7 +1198,7 @@ if "`regparameters'"!="" {
 	// adapt to by-setting 
 	if `isthereby'==1 {
 		foreach bynum2 in `bynum' {
-			if "`bymethod'"=="stratify" {
+			if "`bymethod'"=="stratify" & "`onefit'"=="" {
 				if `isbyvarlabeled'==1 local parbylab`bynum2' {sub:`bylab`bynum2''}
 				if `isbyvarlabeled'==0 local parbylab`bynum2' {sub:`by'=`bynum2'}
 				if `isbyvarlabeled'==1 local parbylabn`bynum2' {sub:`bylab`bynum2''}
@@ -1153,7 +1219,7 @@ if "`regparameters'"!="" {
 
 	// compile the parameters 
 	foreach bynum2 in `bynumalt' {
-		if `isthereby'==1 & "`bymethod'"=="stratify" local bynumname `bynum2'
+		if `isthereby'==1 & "`bymethod'"=="stratify" & "`onefit'"=="" local bynumname `bynum2'
 		
 		* r2
 		if strpos("`regparameters'","r2") & !strpos("`regparameters'","adjr2") {
@@ -1246,6 +1312,13 @@ if "`regparameters'"!="" {
 	local printcoef2 text(`textplace' `coefpar' `intpar' `r2par' `adjr2par' `nobspar', ///
 	placement(center) `parresize' box fc(white) lc(gs5) lw(thin) la(outside) margin(vsmall) alignment(middle) linegap(.3))
 	
+	// revert onefit changes to by locals
+	if "`onefit'"!="" {
+		local by `ogby'
+		local bynum `ogbynum'
+		local bynumalt `ogbynumalt'
+	}
+	
 }
 
 *-------------------------------------------------------------------------------
@@ -1297,6 +1370,8 @@ if `isthereby'==0 {
 }
 
 if `isthereby'==1 {
+	
+	* common by options
 	`ggen' distinctby = group(`by')
 	sum distinctby
 	local maxdistinctby = r(max)
@@ -1305,26 +1380,53 @@ if `isthereby'==1 {
 	foreach bynum2 in `bynum' {
 		if `isbyvarlabeled'==1 local legbyvarl`bynum2' `bylab`bynum2''
 		if `isbyvarlabeled'==0 local legbyvarl`bynum2' `by'==`bynum2'
-		local coln = `coln'+1
-		local colncopy = `coln'
-		if `ownpred_plot'==0 {
-		    if "`ci'"!="" local ciadd "+`coln'"
-			local coln2 = `coln'+`maxdistinctby'`ciadd'
-		}
-		else {
-		    if "`ci'"!="" local ciadd "+`maxdistinctby'"
-			local coln2 = `coln'+`maxdistinctby'`ciadd'
-		}
-		if "`mweighted'"!="" local coln2 = `coln2'+`maxdistinctby'
-		if "`xdistribution'"!="" {
-			local colncopy = `coln'+`maxdistinctby'
-			local coln2 = `coln2'+`maxdistinctby'
-		}
-		if "`mlabel'"=="" local legorder `legorder' `colncopy' "`legbyvarl`bynum2''" `coln2' ""
-		if "`mlabel'"!="" local legorder `legorder' `coln2' "`legbyvarl`bynum2''"
 	}
-	if "`mlabel'"=="" local legcol 2
-	if "`mlabel'"!="" local legcol 1
+	
+	* without onefit
+	if "`onefit'"=="" {
+		foreach bynum2 in `bynum' {
+			local coln = `coln'+1
+			local colncopy = `coln'
+			if `ownpred_plot'==0 {
+				if "`ci'"!="" local ciadd "+`coln'"
+				local coln2 = `coln'+`maxdistinctby'`ciadd'
+			}
+			else {
+				if "`ci'"!="" local ciadd "+`maxdistinctby'"
+				local coln2 = `coln'+`maxdistinctby'`ciadd'
+			}
+			if "`mweighted'"!="" local coln2 = `coln2'+`maxdistinctby'
+			if "`xdistribution'"!="" {
+				local colncopy = `coln'+`maxdistinctby'
+				local coln2 = `coln2'+`maxdistinctby'
+			}
+			if "`mlabel'"=="" local legorder `legorder' `colncopy' "`legbyvarl`bynum2''" `coln2' ""
+			if "`mlabel'"!="" local legorder `legorder' `coln2' "`legbyvarl`bynum2''"
+		}
+	}
+
+	* with onefit
+	if "`onefit'"!="" {
+		if "`xdistribution'"!="" local coln = `coln'+`maxdistinctby'
+		foreach bynum2 in `bynum' {
+			local coln = `coln'+1
+			if "`mlabel'"=="" local firstlegel`bynum2' `coln' "`legbyvarl`bynum2''" 
+			local legorder `legorder' `firstlegel`bynum2''
+		}
+		if "`mweighted'"!="" local coln = `coln'+`maxdistinctby'
+		local coln = `coln'+1
+		local colnp1 = `coln'+1
+		if "`ci'"=="" local legorder `legorder' `coln' "`leg_fit' fit"
+		if "`ci'"!="" local legorder `legorder' `colnp1' "`leg_fit' fit" `coln' "`cilvltext' CIs"
+	}
+	
+	if "`mlabel'"=="" & "`onefit'"=="" {
+		local legcol 2
+	}
+	else {
+		local legcol 1
+	}
+	
 	local legopts `legopts' legend(order(`legorder') col(`legcol') textfirst)
 }
 
@@ -1378,12 +1480,12 @@ if strpos("`xysize'","*") {
 if "`scale'"!="" local plotsize scale(`scale')
 if "`xysize'"!="" {
 	if `xysize'<=1 {
-		local ysize = 100
-		local xsize = 100*`xysize'
+		local ysize = (100)/5
+		local xsize = (100*`xysize')/5
 	}
 	if `xysize'>1 {
-		local xsize = 100
-		local ysize = 100*(1/`xysize')
+		local xsize = (100)/5
+		local ysize = (100*(1/`xysize'))/5
 	}
 	local plotsize `plotsize' xsize(`xsize') ysize(`ysize')
 }
@@ -1412,12 +1514,16 @@ if "`mweighted'"!="" {
 // compile the main plot
 local coln = 0
 foreach bynum2 in `bynum' {
+	if "`onefit'"!="" local by `ogby'
 	local coln = `coln'+1
 	local coln2 = `coln'
 	local coln3 = `coln'
 	if `isthereby'==0 {
 	    local coln2 = `coln'+1
 		local coln3 = `coln'+2
+	}
+	else if "`onefit'"!="" {
+		*local coln2 = `coln'+1
 	}
 	
 	* density of x variable 
@@ -1426,15 +1532,23 @@ foreach bynum2 in `bynum' {
 	* scatter points
 	local sc `sc' (scatter `yplot' `xplot' if `by'==`bynum2' `scw', ``mscattermarkers'`coln2'' `markerlab' `jitter')
 	
-	* fit line & CIs using off-the-shelf fitting
-	if `ownpred_plot'==0 {
-		local pl `pl' (`fittype' `y' `x' if `by'==`bynum2' `w', `o`coln'' `bwidth' `cilvl')
-	}
+	* adapt locals to by+onefit
+	if "`onefit'"!="" local by `altby'
+	if "`onefit'"!="" local bynum `bynumalt2'
+	if "`onefit'"!="" local bynum3 `bynumalt2'
+	if "`onefit'"=="" local bynum3 `bynum2'
+	if "`onefit'"=="" | ("`onefit'"!="" & `coln'==1) {
 	
+	* fit line & CIs using off-the-shelf fitting
+		if `ownpred_plot'==0 {
+			local pl `pl' (`fittype' `y' `x' if `by'==`bynum3' `w', `o`coln'' `bwidth' `cilvl')
+		}
+		
 	* own fit lines and CIs from margins
-	else {
-		if "`ci'"!="" local cis `cis' (rarea cil`bynum2' ciu`bynum2' cix`bynum2', `ciareas`coln'')
-		local pl `pl' (line pe`bynum2' cix`bynum2', `o`coln'')
+		else {
+			if "`ci'"!="" local cis `cis' (rarea cil`bynum3' ciu`bynum3' cix`bynum3', `ciareas`coln'')
+			local pl `pl' (line pe`bynum3' cix`bynum3', `o`coln'')
+		}
 	}
 }
 

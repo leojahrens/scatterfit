@@ -28,7 +28,7 @@ yvar xvar zvar {ifin}
 {syntab:Confidence intervals and standard errors}
 {synopt :{opt ci}}Includes 95% confidence intervals on the overall fitted slope.{p_end}
 {synopt :{opt indslopesci}}Includes 95% confidence intervals for the individual slopes.{p_end}
-{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of the respective regression model.{p_end}
+{synopt :{opt vce(string)}}Specifies the estimated standard errors, which is relevant for confidence intervals and {it:p}-values. Supports all possible vce() options of the respective regression model as well as {it:vce(wbcluster clustervar)} for wild cluster bootstrap.{p_end}
 {synopt :{opt l:evel(num)}}Changes the confidence level of the CIs.{p_end}
 
 {syntab:Regression model}

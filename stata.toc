@@ -1,4 +1,4 @@
-v 1.8.3
+v 1.8.5
 d Leo Ahrens
 p scatterfit scatterfit
 p slopefit slopefit

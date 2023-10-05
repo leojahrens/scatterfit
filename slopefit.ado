@@ -1,4 +1,4 @@
-*! version 1.8.4   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.5   Leo Ahrens   leo@ahrensmail.de
 
 program define slopefit
 version 15
@@ -9,7 +9,7 @@ version 15
 	
 #delimit ;
 
-syntax varlist(min=3 max=3)	[if] [in] [aweight fweight] , [
+syntax varlist(min=3 max=3 numeric)	[if] [in] [aweight fweight] , [
 
 fit(string) ci
 INDSlopes(string) NQuantiles(numlist max=1) NUnibin(numlist max=1) BINVar(varlist max=1)
@@ -134,13 +134,6 @@ if "`binarymodel'"=="probit" local fitmodel probit
 if "`method'"!="" & "`indslopes'"=="" local indslopes `method'
 
 // x and y variables
-foreach mm in x z y {
-	capture confirm numeric variable ``mm''
-	if _rc {
-		di as error "{it:`mm'var} must be numeric."
-		exit 498
-	}
-}
 if "`if'"!="" local ifhelp &
 if "`if'"=="" local ifhelp if
 `duplrep' `y' `if' `ifhelp' !mi(`y')
@@ -150,36 +143,45 @@ if "`binarymodel'"!="" & `yvalcount'!=2 {
 	di as error "Logit/probit/LPM models require a binary dependent variable."
 	exit 498
 }
+if `yvalcount'==2 & strpos("`vce'","wbcluster") {
+	di as error "Stata has no native support for wild cluster bootstrap with logit/probit models. The results are obtained from OLS."
+}
 
 // regression model 
 if "`binarymodel'"!="" & !("`binarymodel'"=="logit" | "`binarymodel'"=="probit") {
 	di as error "bf:binarymodel() must be set to logit or probit."
 	exit 498
 }
-if "`fitmodel'"!="" & !inlist("`fitmodel'","ols","poisson","logit","probit","flogit","fprobit","lpm") & !(strpos("`fitmodel'","randomint") | strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg")) {
-	di as error "fitmodel() must be set to {it:ols}, {it:poisson}, {it:quantile}, {it:randomint}, {it:flogit}, {it:fprobit}, {it:logit}, {it:probit}, or {it:lpm}."
-	exit 498
-}
-if strpos("`fitmodel'","randomint") {
-	local strtest = subinstr("`fitmodel'", "randomint", "",.)
-	if "`strtest'"=="" {
-		di as error "You need to specify the higher level cluster of the multilevel model using fitmodel(randomint, cluster(varname))."
+if "`fitmodel'"!="" {
+	if !inlist("`fitmodel'","ols","poisson","logit","probit","flogit","fprobit","lpm") & !(strpos("`fitmodel'","randomint") | strpos("`fitmodel'","quantile") | strpos("`fitmodel'","mmreg")) {
+		di as error "fitmodel() must be set to {it:ols}, {it:poisson}, {it:quantile}, {it:randomint}, {it:flogit}, {it:fprobit}, {it:logit}, {it:probit}, or {it:lpm}."
 		exit 498
 	}
-	else {
-		local rintcluster = subinstr(subinstr(subinstr(subinstr("`fitmodel'", "reml", "",.), ")", "",.),",","",.),"(","",.)
-		local rintcluster = subinstr(subinstr("`rintcluster'","cluster","",.),"randomint", "",.)
-		cap qui sum `rintcluster'
-		if _rc di as error "Something went wrong. Please use this syntax for specifying a random intercepts model:  fitmodel(randomint, cluster(varname)) - optionally you can also include {it:reml} in the brackets."
-		if _rc exit 498
+	if strpos("`fitmodel'","randomint") {
+		local strtest = subinstr("`fitmodel'", "randomint", "",.)
+		if "`strtest'"=="" {
+			di as error "You need to specify the higher level cluster of the multilevel model using fitmodel(randomint, cluster(varname))."
+			exit 498
+		}
+		else {
+			local rintcluster = subinstr(subinstr(subinstr(subinstr("`fitmodel'", "reml", "",.), ")", "",.),",","",.),"(","",.)
+			local rintcluster = subinstr(subinstr("`rintcluster'","cluster","",.),"randomint", "",.)
+			cap qui sum `rintcluster'
+			if _rc di as error "Something went wrong. Please use this syntax for specifying a random intercepts model:  fitmodel(randomint, cluster(varname)) - optionally you can also include {it:reml} in the brackets."
+			if _rc exit 498
+		}
 	}
-}
-if strpos("`fitmodel'","quantile") {
-	local qregquant = subinstr(subinstr(subinstr("`fitmodel'", ")", "",.), "(", "",.), ",", "",.)
-	local qregquant = subinstr(subinstr(subinstr("`qregquant'", "p", "",.), "quantile", "",.)," ","",.)
-	cap dis `qregquant'*1
-	if _rc & "`qregquant'"!="" {
-		di as error "Something went wrong. Please use this syntax for specifying a quantile regression model: {it:fitmodel(quantile, p(x))}, where x is a quantile between 0 and 100."
+	if strpos("`fitmodel'","quantile") {
+		local qregquant = subinstr(subinstr(subinstr("`fitmodel'", ")", "",.), "(", "",.), ",", "",.)
+		local qregquant = subinstr(subinstr(subinstr("`qregquant'", "p", "",.), "quantile", "",.)," ","",.)
+		cap dis `qregquant'*1
+		if _rc & "`qregquant'"!="" {
+			di as error "Something went wrong. Please use this syntax for specifying a quantile regression model: {it:fitmodel(quantile, p(x))}, where x is a quantile between 0 and 100."
+			exit 498
+		}
+	}
+	if strpos("`vce'","wbcluster") {
+		di as error "fitmodel() cannot be used when wild cluster bootstrap SEs are estimated."
 		exit 498
 	}
 }
@@ -279,7 +281,8 @@ if "`controls'`fcontrols'"!="" | "`binvar'"!="" | "`mlabel'"!="" {
 drop if mi(`x') | mi(`y') | mi(`z') `covdrop'
 if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
-if strpos("`vce'","cluster") local clustervar: subinstr local vce "cluster" "", all
+if strpos("`vce'","cluster") & !strpos("`vce'","wbcluster") local clustervar: subinstr local vce "cluster" "", all
+if strpos("`vce'","wbcluster") local clustervar: subinstr local vce "wbcluster" "", all
 if strpos("`fitmodel'","cluster") local clustervar2 `rintcluster'
 keep `x' `y' `z' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar' `clustervar2'
 
@@ -452,7 +455,7 @@ if "`fit'"=="quadratic" local xzcont c.`x'##c.`z'##c.`z'
 if "`fit'"=="cubic" local xzcont c.`x'##c.`z'##c.`z'##c.`z'
 
 // choose correct regression model
-if "`fitmodel'"=="" {
+if "`fitmodel'"=="" & !strpos("`vce'","wbcluster") {
 	if `binarydv'==0 local model reghdfe 
 	if `binarydv'==1 local model logit 
 }
@@ -467,6 +470,7 @@ else {
 	if strpos("`fitmodel'","quantile") local model robreg q
 	if strpos("`fitmodel'","randomint") & `binarydv'==0 local model mixed
 	if strpos("`fitmodel'","randomint") & `binarydv'==1 local model melogit
+	if strpos("`vce'","wbcluster") local model wildboot reg
 }
 
 // full regression variable specification
@@ -483,8 +487,8 @@ else {
 // regression options
 if "`fcontrols'"=="" local hdfeabsorb noabsorb
 if "`fcontrols'"!="" local hdfeabsorb absorb(`fcontrols')
-if "`vce'"!="" local vce vce(`vce')
-local regmodelopts `cilvl' `vce'
+if "`vce'"!="" & "`model'"!="wildboot reg" local vce2 vce(`vce')
+local regmodelopts `cilvl' `vce2'
 
 if "`model'"=="reghdfe" {
 	local regmodelopts `regmodelopts' `hdfeabsorb'
@@ -495,6 +499,10 @@ else if "`model'"=="mixed" {
 	foreach cl in `rintcluster' {
 		local regvars `regvars' || `cl':
 	}
+}
+
+else if "`model'"=="wildboot reg" {
+	local regmodelopts `regmodelopts' cluster(`clustervar') coef(`xzfactor' `xzcont')
 }
 
 else if "`model'"=="robreg q" {
@@ -1046,12 +1054,12 @@ if strpos("`xysize'","*") {
 if "`scale'"!="" local plotsize scale(`scale')
 if "`xysize'"!="" {
 	if `xysize'<=1 {
-		local ysize = 100
-		local xsize = 100*`xysize'
+		local ysize = (100)/5
+		local xsize = (100*`xysize')/5
 	}
 	if `xysize'>1 {
-		local xsize = 100
-		local ysize = 100*(1/`xysize')
+		local xsize = (100)/5
+		local ysize = (100*(1/`xysize'))/5
 	}
 	local plotsize `plotsize' xsize(`xsize') ysize(`ysize')
 }
