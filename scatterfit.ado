@@ -1,4 +1,4 @@
-*! version 1.8.5   Leo Ahrens   leo@ahrensmail.de
+*! version 1.8.6   Leo Ahrens   leo@ahrensmail.de
 
 program define scatterfit
 version 15
@@ -340,7 +340,8 @@ if "`if'"!="" keep `if'
 if "`in'"!="" keep `in'
 if strpos("`vce'","cluster") & !strpos("`vce'","wbcluster") local clustervar: subinstr local vce "cluster" "", all
 if strpos("`vce'","wbcluster") local clustervar: subinstr local vce "wbcluster" "", all
-keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar'
+if strpos("`fitmodel'","cluster") & "`rintcluster'"!="`clustervar'" local recluster `rintcluster'
+keep `x' `y' `by' `controls' `fcontrols' `binvar' `mlabel' `weightname' `clustervar' `recluster'
 
 
 *-------------------------------------------------------------------------------
